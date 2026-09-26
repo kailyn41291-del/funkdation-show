@@ -839,9 +839,37 @@
 
   function sceneKey(cue) { return cue ? cue.id + '#' + cue.type + '#' + FDM.layoutKey(cue) : 'none'; }
 
+  // 預先載入並解碼所有照片、外框、印章、底圖，切換畫面時不會因為解碼大圖而卡一下
+  var preloaded = {}, preloadSig = '';
+  function preloadAssets() {
+    var list = [S.frame];
+    S.teams.forEach(function (t) { if (t.photo) list.push(t.photo.trim || t.photo.src); });
+    S.sponsors.logos.forEach(function (l) { list.push(l.src); });
+    for (var k in S.layouts) {
+      var L = S.layouts[k];
+      if (!L) continue;
+      if (L.bg && L.bg.mode === 'image') list.push(L.bg.src);
+      if (L.seal && L.seal.img) list.push(L.seal.img);
+    }
+    list = list.filter(Boolean);
+    var sig = list.join('|');
+    if (sig === preloadSig) return;
+    preloadSig = sig;
+    list.forEach(function (p) {
+      var u = asset(p);
+      if (preloaded[u]) return;
+      var im = new Image();
+      im.decoding = 'async';
+      im.src = u;
+      if (im.decode) im.decode().catch(function () {});
+      preloaded[u] = im;
+    });
+  }
+
   var transitioning = null;
   function render(meta) {
     applyLook();
+    preloadAssets();
     var cue = targetCue();
     var key = sceneKey(cue);
     var seq = PREVIEW ? 0 : S.show.seq;
@@ -910,7 +938,8 @@
       current.scene.event(ev);
     },
     onStatus: function (s) {
-      document.getElementById('offline').style.display = s === 'offline' && !MONITOR ? 'block' : 'none';
+      // 觀眾看得到輸出畫面，斷線時不顯示任何文字，保持最後的畫面；只在網址加 ?debug=1 時提示
+      document.getElementById('offline').style.display = s === 'offline' && params.get('debug') === '1' ? 'block' : 'none';
     }
   });
 

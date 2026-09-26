@@ -29,6 +29,11 @@ let sleepBlock = null;
 
 function url(p) { return `http://127.0.0.1:${port}${p}`; }
 
+// macOS 用「簡易全螢幕」：不會另開桌面空間、沒有轉場動畫，接投影機時最穩定
+const IS_MAC = process.platform === 'darwin';
+function isFull(w) { return IS_MAC ? w.isSimpleFullScreen() : w.isFullScreen(); }
+function setFull(w, on) { if (!w || w.isDestroyed()) return; if (IS_MAC) w.setSimpleFullScreen(on); else w.setFullScreen(on); }
+
 function displayList() {
   const primary = screen.getPrimaryDisplay().id;
   return screen.getAllDisplays().map((d, i) => ({
@@ -45,9 +50,9 @@ function openOutput(displayId, fullscreen = true) {
     || screen.getPrimaryDisplay();
   const b = target.bounds;
   if (output && !output.isDestroyed()) {
-    output.setFullScreen(false);
+    setFull(output, false);
     output.setBounds({ x: b.x + 40, y: b.y + 40, width: Math.min(1280, b.width - 80), height: Math.min(720, b.height - 80) });
-    if (fullscreen) setTimeout(() => output && !output.isDestroyed() && output.setFullScreen(true), 150);
+    if (fullscreen) setTimeout(() => setFull(output, true), 150);
     output.show();
     return;
   }
@@ -62,12 +67,12 @@ function openOutput(displayId, fullscreen = true) {
   });
   output.setMenuBarVisibility(false);
   output.loadURL(url('/output/'));
-  output.once('ready-to-show', () => { if (fullscreen) output.setFullScreen(true); });
-  if (fullscreen) setTimeout(() => output && !output.isDestroyed() && output.setFullScreen(true), 400);
+  output.once('ready-to-show', () => { if (fullscreen) setFull(output, true); });
+  if (fullscreen) setTimeout(() => { if (output && !output.isDestroyed() && !isFull(output)) setFull(output, true); }, 400);
   output.webContents.on('before-input-event', (e, input) => {
     if (input.type !== 'keyDown') return;
-    if (input.key === 'Escape' && output.isFullScreen()) { output.setFullScreen(false); e.preventDefault(); }
-    if (input.key.toLowerCase() === 'f' && !input.control && !input.meta) { output.setFullScreen(!output.isFullScreen()); e.preventDefault(); }
+    if (input.key === 'Escape' && isFull(output)) { setFull(output, false); e.preventDefault(); }
+    if (input.key.toLowerCase() === 'f' && !input.control && !input.meta) { setFull(output, !isFull(output)); e.preventDefault(); }
   });
   output.webContents.on('render-process-gone', () => { if (output && !output.isDestroyed()) output.reload(); });
   output.on('closed', () => { output = null; buildMenu(); });
@@ -98,7 +103,7 @@ function buildMenu() {
       submenu: [
         ...outs,
         { type: 'separator' },
-        { label: '輸出視窗：切換全螢幕', accelerator: 'CmdOrCtrl+Shift+F', enabled: !!output, click: () => output && output.setFullScreen(!output.isFullScreen()) },
+        { label: '輸出視窗：切換全螢幕', accelerator: 'CmdOrCtrl+Shift+F', enabled: !!output, click: () => output && setFull(output, !isFull(output)) },
         { label: '關閉輸出視窗', enabled: !!output, click: closeOutput }
       ]
     },

@@ -199,6 +199,20 @@
       .then(function (r) { toast('已上傳 ' + file.name); return r.path; });
   }
 
+  // 上傳前確認這台電腦能播放影片（ok / bad / unknown）
+  function checkVideo(file) {
+    return new Promise(function (res) {
+      var v = document.createElement('video'), u = URL.createObjectURL(file), done = false;
+      function fin(ok) { if (done) return; done = true; var r = { ok: ok, w: v.videoWidth, h: v.videoHeight }; v.removeAttribute('src'); v.load(); URL.revokeObjectURL(u); res(r); }
+      v.muted = true;
+      v.preload = 'auto';
+      v.onloadeddata = function () { fin(v.videoWidth > 0 ? 'ok' : 'bad'); };
+      v.onerror = function () { fin('bad'); };
+      setTimeout(function () { fin('unknown'); }, 8000);
+      v.src = u;
+    });
+  }
+
   // 去背照片：自動偵測人物範圍，裁掉四周透明
   function processPhoto(file) {
     return upload(file).then(function (src) {
@@ -879,7 +893,16 @@
         var isV = bg.mode === 'video';
         add(box, fld(isV ? '影片' : '圖片', h('div', { class: 'inl' },
           uploadBtn(isV ? '上傳影片' : '上傳圖片', isV ? 'video/mp4,video/webm,video/quicktime' : 'image/*', false, function (f) {
-            upload(f[0]).then(function (p) { setPath(bgPath.concat('src'), p); draw(); }).catch(fail);
+            (isV ? checkVideo(f[0]) : Promise.resolve({ ok: 'ok' })).then(function (r) {
+              if (r.ok === 'bad') {
+                toast('這個影片在這台電腦無法播放（常見原因：HEVC／H.265 編碼，例如 iPhone 錄影）。請轉成 H.264 的 MP4 再上傳。', true);
+                return;
+              }
+              return upload(f[0]).then(function (p) {
+                setPath(bgPath.concat('src'), p); draw();
+                if (r.w && (r.w !== 1920 || r.h !== 1080)) toast('已上傳。影片尺寸是 ' + r.w + '×' + r.h + '，會自動填滿 1920×1080 畫面（比例不同時邊緣會被裁切）。');
+              });
+            }).catch(fail);
           }),
           h('span', { class: 'faint', text: bg.src ? String(bg.src).replace(/^assets\/\w+-/, '') : '尚未上傳（1920×1080）' }))));
         if (isV) add(box, fld('聲音', chk('播放影片聲音（只在正式輸出播放）', bgPath.concat('sound'))));
