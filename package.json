@@ -1,0 +1,107 @@
+{
+  "name": "funkdation-show",
+  "version": "1.0.0",
+  "description": "FUNKDATION VOL.4 賽事播出系統",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "server": "node server.js",
+    "test": "node --test test/",
+    "dist:win": "electron-builder --win --x64",
+    "dist:mac": "electron-builder --mac --x64 --arm64"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.18",
+    "express": "^4.21.2",
+    "multer": "^2.0.2",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@fontsource/cinzel": "^5.3.0",
+    "@fontsource/noto-serif-tc": "^5.3.0",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "playwright-core": "^1.63.0"
+  },
+  "productName": "FUNKDATION 播出系統",
+  "author": "FUNKDATION",
+  "build": {
+    "appId": "tw.funkdation.show",
+    "productName": "FUNKDATION 播出系統",
+    "artifactName": "FUNKDATION-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "server.js",
+      "store.js",
+      "default-state.js",
+      "public/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "FUNKDATION 播出系統",
+      "artifactName": "FUNKDATION-${version}-Windows-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "FUNKDATION-${version}-Windows-Portable.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.entertainment",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png"
+    },
+    "publish": null
+  },
+  "directories": {
+    "test": "test"
+  },
+  "keywords": [],
+  "license": "ISC"
+}

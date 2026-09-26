@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FUNKDATION 輸出畫面</title>
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="icon" href="/favicon.svg">
+<link rel="stylesheet" href="output.css">
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+    <div class="bg" id="bgA"><video muted loop playsinline preload="auto"></video></div>
+    <div class="bg" id="bgB"><video muted loop playsinline preload="auto"></video></div>
+    <div id="shake"><div id="scenes"></div></div>
+    <div id="vig"></div>
+    <div id="guides"></div>
+  </div>
+</div>
+<div id="offline">與控制面板的連線中斷，正在重新連線…</div>
+<script src="/shared/fd-client.js"></script>
+<script src="/shared/model.js"></script>
+<script src="/shared/fx.js"></script>
+<script src="output.js"></script>
+</body>
+</html>
