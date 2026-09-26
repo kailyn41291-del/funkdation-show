@@ -15,8 +15,24 @@ if (!app.requestSingleInstanceLock()) {
   process.exit(0);
 }
 
-const DATA_DIR = path.join(app.getPath('documents'), 'FUNKDATION 賽事資料');
-fs.mkdirSync(DATA_DIR, { recursive: true });
+// 優先存在「文件」資料夾（容易找到）；若被系統擋住（Mac 拒絕權限、Windows 勒索軟體防護），改存到程式自己的資料夾
+function pickDataDir() {
+  const candidates = [
+    path.join(app.getPath('documents'), 'FUNKDATION 賽事資料'),
+    path.join(app.getPath('userData'), '賽事資料')
+  ];
+  for (const dir of candidates) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      const probe = path.join(dir, '.write-test');
+      fs.writeFileSync(probe, 'ok');
+      fs.unlinkSync(probe);
+      return dir;
+    } catch (e) { /* 試下一個位置 */ }
+  }
+  return candidates[candidates.length - 1];
+}
+const DATA_DIR = pickDataDir();
 process.env.FD_DATA = DATA_DIR;
 process.env.FD_PORT = process.env.FD_PORT || '3010';
 
