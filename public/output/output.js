@@ -13,6 +13,7 @@
   var PREVIEW = params.get('preview');
   var IS_PREVIEW_FRAME = !!PREVIEW;
   var MONITOR = params.get('monitor') === '1' || !!PREVIEW;
+  var STILL = params.get('still') === '1'; // 只顯示影片第一格（NEXT 監看畫面，省效能）
   if (MONITOR) document.body.classList.add('monitor');
 
   var W = 1920, H = 1080;
@@ -177,7 +178,8 @@
       video.style.display = 'block';
       if (video.getAttribute('src') !== asset(bg.src)) video.src = asset(bg.src);
       video.muted = MONITOR || !bg.sound;
-      video.play().catch(function () { video.muted = true; video.play().catch(function () {}); });
+      if (STILL) { video.pause(); video.currentTime = 0.1; }
+      else video.play().catch(function () { video.muted = true; video.play().catch(function () {}); });
     } else {
       video.pause();
       video.removeAttribute('src');
@@ -732,9 +734,9 @@
       sZ.text(k === 'c' ? tx.cz : tx.rz);
       return t;
     }
-    sc.update = function (c) {
-      sc.ctx = c;
-      var v = c.layout.v, tx = c.layout.text, tm = teams();
+    // 只排版與更新文字，不改變目前顯示的是哪個畫面
+    function layout() {
+      var c = sc.ctx, v = c.layout.v, tx = c.layout.text, tm = teams();
       var soloTeam = texts(soloK);
       leadA.at(W / 2, v.lY, v.lEs);
       leadB.at(W / 2, v.lY + v.lEs + v.lG, v.lZs);
@@ -753,7 +755,12 @@
       cN.at(cx + cw / 2, ty + ch + v.dNg, v.cNs);
       rT.at(rx + rw / 2, ry - v.dTg - v.rTs, v.rTs);
       rN.at(rx + rw / 2, ry + rh + v.dNg, v.rNs);
+    }
+    sc.update = function (c) {
+      sc.ctx = c;
+      layout();
       var want = c.preview ? previewView : (S.show.champView || 'none');
+      // 揭曉動畫進行中：等狀態追上動畫後才恢復同步
       if (pendingView) { if (want === pendingView) pendingView = null; return; }
       if (want !== view) setView(want, true);
     };
@@ -762,7 +769,7 @@
       var tl = sc.restart();
       view = vw;
       pendingView = null;
-      if (vw.indexOf('-') > 0) { soloK = vw.split('-')[1]; sc.update(sc.ctx); texts(soloK); }
+      if (vw.indexOf('-') > 0) { soloK = vw.split('-')[1]; layout(); }
       var g = groupOf(vw);
       ['lead', 'solo', 'duo'].forEach(function (k) {
         GROUP[k].forEach(function (el) {
@@ -775,9 +782,9 @@
       var tl = sc.restart(), L = sc.ctx.layout;
       view = 'solo-' + k;
       soloK = k;
-      sc.update(sc.ctx);
-      pendingView = view;
-      if (sc.ctx.preview) { previewView = view; pendingView = null; }
+      pendingView = sc.ctx.preview ? null : view;
+      if (sc.ctx.preview) previewView = view;
+      layout();
       ['lead', 'solo', 'duo'].forEach(function (g) { GROUP[g].forEach(FX.hide); });
       var A = FDM.chain(['lt', 'lz'], L.anim, 0, effectsOn);
       tl.at(A.lt.start, function () { FX.run(leadA.t, A.lt.fx, A.lt.dur, tl); });
@@ -795,6 +802,7 @@
       view = 'duo';
       pendingView = sc.ctx.preview ? null : 'duo';
       if (sc.ctx.preview) previewView = 'duo';
+      layout();
       ['lead', 'solo', 'duo'].forEach(function (g) { GROUP[g].forEach(FX.hide); });
       var ord = ['df', 'dp', 'dn', 'dt'];
       var D = FDM.chain(ord, L.anim, 0, effectsOn);

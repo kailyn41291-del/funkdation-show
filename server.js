@@ -178,7 +178,7 @@ wss.on('connection', (ws, req) => {
       try {
         // 動畫事件先送出，再送狀態，輸出畫面才能分辨「要播動畫」還是「直接套用」
         if (msg.event) broadcast({ type: 'event', event: msg.event, origin: msg.origin || null });
-        currentMeta = { origin: msg.origin || null, quiet: !!msg.quiet, event: msg.event ? msg.event.name : null };
+        currentMeta = { origin: msg.origin || null, id: msg.id, quiet: !!msg.quiet, event: msg.event ? msg.event.name : null };
         let rev = store.rev;
         try {
           if (msg.ops && msg.ops.length) rev = store.apply(msg.ops);

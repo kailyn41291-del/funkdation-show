@@ -36,7 +36,7 @@ body.monitor { cursor: default; }
 .ls-tm { letter-spacing: .06em; padding-left: .06em; }
 .ls-lead { letter-spacing: .14em; padding-left: .14em; }
 .ls-title { letter-spacing: .34em; padding-left: .34em; }
-.grain .t { -webkit-mask-size: 180px 180px; mask-size: 180px 180px; }
+.grain .t { -webkit-mask-size: 3.4em 3.4em; mask-size: 3.4em 3.4em; }
 
 .pbox { position: absolute; }
 .pbox .ph { position: absolute; overflow: hidden; opacity: 0; }

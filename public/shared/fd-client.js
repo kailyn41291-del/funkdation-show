@@ -87,6 +87,25 @@
       assetUrl: function (p) { return p ? '/' + String(p).replace(/^\/+/, '') : ''; }
     };
     var ws = null, seq = 0, pending = {}, retry = 0, bestRtt = Infinity, closedByUser = false;
+    // 樂觀更新：server = 伺服器確認過的狀態；inflight = 已送出、尚未確認的修改。
+    // 畫面上的狀態 = server ＋ inflight ＋ 尚未送出的本機修改（opts.localOps）。
+    // 這樣伺服器回傳較舊的確認時，不會蓋掉剛做的新修改。
+    var server = null, inflight = [];
+    function tryApply(s, op) { try { applyOne(s, op); } catch (e) { /* 伺服器會以自己的結果為準 */ } }
+    function rebuild() {
+      var local = opts.localOps ? opts.localOps() : null;
+      if (!opts.localOps && !inflight.length) { api.state = server; return; }
+      var s = clone(server);
+      for (var i = 0; i < inflight.length; i++) for (var j = 0; j < inflight[i].ops.length; j++) tryApply(s, inflight[i].ops[j]);
+      if (local) for (var k = 0; k < local.length; k++) tryApply(s, local[k]);
+      api.state = s;
+    }
+    function settle(id) {
+      var i = -1;
+      for (var n = 0; n < inflight.length; n++) if (inflight[n].id === id) { i = n; break; }
+      if (i >= 0) inflight.splice(0, i + 1); // 伺服器依序處理，之前的也都已確認
+      return i >= 0;
+    }
     var wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
 
     function setStatus(s) {
@@ -116,7 +135,8 @@
         var m;
         try { m = JSON.parse(ev.data); } catch (e) { return; }
         if (m.type === 'hello' || m.type === 'state') {
-          api.state = m.state;
+          server = m.state;
+          rebuild();
           api.rev = m.rev;
           if (m.savedRev !== undefined) api.savedRev = m.savedRev;
           if (m.serverTime && bestRtt === Infinity) api.offset = m.serverTime - Date.now();
@@ -128,7 +148,11 @@
             return;
           }
           try {
-            for (var i = 0; i < m.ops.length; i++) applyOne(api.state, m.ops[i]);
+            var mine = m.meta && m.meta.origin === api.id;
+            var direct = server === api.state && !inflight.length;
+            for (var i = 0; i < m.ops.length; i++) applyOne(server, m.ops[i]);
+            if (mine) settle(m.meta.id);
+            if (!direct || mine) rebuild();
             api.rev = m.rev;
             emit('ops', m.meta);
           } catch (e) {
@@ -141,6 +165,7 @@
           if (opts.onSaved) opts.onSaved(m.rev);
         } else if (m.type === 'ack' || m.type === 'nack') {
           var p = pending[m.id];
+          if (settle(m.id) || m.type === 'nack') { rebuild(); if (m.type === 'nack') emit('ops', null); }
           if (p) {
             delete pending[m.id];
             if (m.type === 'ack') p.resolve(m.rev); else p.reject(new Error(m.error));
@@ -156,6 +181,7 @@
       ws.onclose = function () {
         setStatus('offline');
         for (var id in pending) { pending[id].reject(new Error('連線中斷')); delete pending[id]; }
+        inflight = [];
         if (closedByUser) return;
         retry = Math.min(retry + 1, 6);
         setTimeout(open, Math.min(2000, 150 * retry));
@@ -170,6 +196,7 @@
         if (!ws || ws.readyState !== 1) { reject(new Error('尚未連線到伺服器')); return; }
         var id = ++seq;
         pending[id] = { resolve: resolve, reject: reject };
+        if (ops && ops.length) inflight.push({ id: id, ops: clone(ops) });
         ws.send(JSON.stringify({ type: 'ops', id: id, ops: ops, origin: api.id, event: extra.event || null, quiet: !!extra.quiet }));
       });
     }

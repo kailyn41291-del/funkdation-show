@@ -64,7 +64,14 @@
       else scheduleRender();
     },
     onStatus: function (s) { status.conn = s; renderStatus(); },
-    onSaved: function (r) { status.saved = r >= fd.rev; renderStatus(); }
+    onSaved: function (r) { status.saved = r >= fd.rev; renderStatus(); },
+    // 尚未送出的本機修改，伺服器回傳舊確認時要重新套上
+    localOps: function () {
+      var ops = [];
+      if (!pendingOps) return ops;
+      pendingOps.forEach(function (v, k) { ops.push({ op: 'set', path: JSON.parse(k), value: v }); });
+      return ops;
+    }
   });
   fetch('/api/defaults').then(function (r) { return r.json(); }).then(function (d) { D = d; if (S) renderAll(); }).catch(fail);
 
@@ -226,17 +233,11 @@
   // ---------------------------------------------------------------------------
   // 監看畫面（iframe 1920×1080 縮放）
   // ---------------------------------------------------------------------------
+  // 監看畫面直接以小尺寸渲染（輸出頁會自己縮放），比先畫 1920×1080 再縮小省很多效能
   var monitors = [];
-  var ro = new ResizeObserver(function (entries) {
-    entries.forEach(function (e) {
-      var f = e.target.querySelector('iframe');
-      if (f) f.style.transform = 'scale(' + (e.contentRect.width / 1920) + ')';
-    });
-  });
   function monitor(src, label, cls) {
     var f = h('iframe', { src: src, title: label, tabindex: '-1' });
     var m = h('div', { class: 'mon ' + (cls || '') }, h('div', { class: 'lab', text: label }), f);
-    ro.observe(m);
     monitors.push(m);
     return { el: m, frame: f, post: function (msg) { msg.fd = 'preview'; try { f.contentWindow.postMessage(msg, '*'); } catch (e) { /* 忽略 */ } } };
   }
@@ -354,7 +355,7 @@
     } else {
       var nx = nextCue();
       flowView.liveMon = monitor('/output/?monitor=1', 'LIVE 播出中', 'live');
-      flowView.nextMon = monitor('/output/?preview=' + encodeURIComponent(nx ? nx.id : ''), 'NEXT 下一個', 'next');
+      flowView.nextMon = monitor('/output/?still=1&preview=' + encodeURIComponent(nx ? nx.id : ''), 'NEXT 下一個', 'next');
       flowView.nextId = nx ? nx.id : null;
       add(center, [flowView.liveMon.el, h('div', { class: 'monrow' }, h('div', { class: 'hint', html: shortcutHelp() }), flowView.nextMon.el)]);
     }
