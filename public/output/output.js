@@ -48,7 +48,15 @@
     return {
       wrap: wrap, t: t,
       text: function (s) { if (t.textContent !== s) t.textContent = s; },
-      at: function (x, y, size) { px(wrap, { left: x, top: y, fontSize: size }); }
+      // maxW：文字超過這個寬度時自動縮小字級（長隊名不會撞到隔壁）
+      at: function (x, y, size, maxW) {
+        px(wrap, { left: x, top: y, fontSize: size });
+        if (maxW > 0 && t.textContent) {
+          var w = t.offsetWidth;
+          if (w > maxW) wrap.style.fontSize = (size * maxW / w).toFixed(2) + 'px';
+        }
+        return parseFloat(wrap.style.fontSize) || size;
+      }
     };
   }
 
@@ -299,8 +307,8 @@
       box.set(t, x, y, w, h, v.pad, c.preview && !t);
       en.text(t ? t.en : (c.preview ? '（未選隊伍）' : ''));
       zh.text(FDM.line2(S, t));
-      en.at(cx, y + h + v.ng, v.es);
-      zh.at(cx, y + h + v.ng + v.es + v.lg, v.zs);
+      var es = en.at(cx, y + h + v.ng, v.es, W - 160);
+      zh.at(cx, y + h + v.ng + es + v.lg, v.zs, W - 160);
       if (!c.preview) {
         var out = !!S.show.teamOut;
         if (out && visible) { ORDER.forEach(function (k) { FX.hide(EL[k]); }); visible = false; }
@@ -389,8 +397,9 @@
         s.box.set(t, 0, 0, w, h, v.pad, sc.ctx.preview);
         s.en.text(t ? t.en : '');
         s.zh.text(FDM.line2(S, t));
-        s.en.at(w / 2, h + v.ng, v.ens);
-        s.zh.at(w / 2, h + v.ng + v.ens + 10, v.zhs);
+        var maxW = w + Math.max(0, mode() === 'row' ? v.close : Math.min(v.close, v.vsg)) - 12;
+        var es = s.en.at(w / 2, h + v.ng, v.ens, maxW);
+        s.zh.at(w / 2, h + v.ng + es + 10, v.zhs, maxW);
       });
       vs.forEach(function (e, p) {
         px(e, { left: P.vsx[p], top: v.top + h / 2, fontSize: v.vss });
@@ -531,11 +540,11 @@
       pL.set(tL, xl, T, w, h, v.pad, c.preview && (!tL || tL._ph));
       pR.set(tR, xr, T, w, h, v.pad, c.preview && (!tR || tR._ph));
       [[enL, zhL, tL, xl + w / 2], [enR, zhR, tR, xr + w / 2]].forEach(function (a) {
-        var t = a[2], es = t && t.en.length > 13 ? Math.round(v.es * 0.82) : v.es;
+        var t = a[2], maxW = w + Math.max(0, v.pd * 2 - 40);
         a[0].text(t ? t.en : '');
         a[1].text(t && t._ph ? t.tag : FDM.line2(S, t));
-        a[0].at(a[3], T + h + v.ng, es);
-        a[1].at(a[3], T + h + v.ng + es + 14, v.zs);
+        var es = a[0].at(a[3], T + h + v.ng, v.es, Math.min(maxW, W / 2 - 40));
+        a[1].at(a[3], T + h + v.ng + es + 14, v.zs, Math.min(maxW, W / 2 - 40));
       });
       px(hdr, { left: W / 2, top: v.hy });
       h1.style.fontSize = v.hs + 'px';
@@ -743,8 +752,8 @@
       var w = v.sw, h = Math.round(w * 2 / 3), y = v.sy;
       sB.set(soloTeam, (W - w) / 2, y, w, h, v.pad, c.preview && (!soloTeam || soloTeam._ph));
       sT.at(W / 2, y - v.sTg - v.sTs, v.sTs);
-      sN.at(W / 2, y + h + v.sNg, v.sNs);
-      sZ.at(W / 2, y + h + v.sNg + v.sNs + v.sZg, v.sZs);
+      var sns = sN.at(W / 2, y + h + v.sNg, v.sNs, W - 160);
+      sZ.at(W / 2, y + h + v.sNg + sns + v.sZg, v.sZs);
       var cw = v.cw, ch = Math.round(cw * 2 / 3), rw = v.rw, rh = Math.round(rw * 2 / 3);
       var tot = cw + v.gap + rw, cx = W / 2 - tot / 2, rx = cx + cw + v.gap, ty = v.dy, ry = ty + (ch - rh);
       cB.set(tm.c, cx, ty, cw, ch, v.pad, c.preview && (!tm.c || tm.c._ph));
@@ -752,9 +761,9 @@
       cT.text(tx.tc); rT.text(tx.trr);
       cN.text(tm.c ? tm.c.en : ''); rN.text(tm.r ? tm.r.en : '');
       cT.at(cx + cw / 2, ty - v.dTg - v.cTs, v.cTs);
-      cN.at(cx + cw / 2, ty + ch + v.dNg, v.cNs);
+      cN.at(cx + cw / 2, ty + ch + v.dNg, v.cNs, cw + Math.max(0, v.gap) - 20);
       rT.at(rx + rw / 2, ry - v.dTg - v.rTs, v.rTs);
-      rN.at(rx + rw / 2, ry + rh + v.dNg, v.rNs);
+      rN.at(rx + rw / 2, ry + rh + v.dNg, v.rNs, rw + Math.max(0, v.gap) - 20);
     }
     sc.update = function (c) {
       sc.ctx = c;

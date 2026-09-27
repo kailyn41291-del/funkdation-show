@@ -47,7 +47,7 @@ function defaultLayouts() {
         hy: 170, hs: 34, hg: 60,
         ty: 700, ts: 64,
         es: 46, zs: 26, ng: 30,
-        gs: 150, gx: -20, gy: -20, ga: -6
+        gs: 150, gx: -20, gy: -50, ga: -6
       },
       divider: true,
       anim: { duration: 500, overlap: 60, stagger: 300, steps: { fr: step('fade'), ph: step('ink'), nm: step('brush'), info: step('fade') } },
