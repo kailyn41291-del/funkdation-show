@@ -185,6 +185,9 @@ class Store extends EventEmitter {
     }
     if (loaded) {
       this.state = fillDefaults(loaded.state, defaultState());
+      // 舊版允許負的併排間距（照片會重疊），載入時改成 0
+      const t4 = this.state.layouts && this.state.layouts.top4;
+      if (t4 && t4.v && t4.v.close < 0) t4.v.close = 0;
       this.rev = Number.isInteger(loaded.rev) ? loaded.rev : 0;
     } else {
       this.state = defaultState();

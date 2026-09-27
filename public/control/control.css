@@ -78,6 +78,7 @@ header { flex: none; }
 .cue .s { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cue .acts { display: flex; gap: 0; opacity: 0; }
 .cue:hover .acts, .cue.sel .acts { opacity: 1; }
+.cue.live .acts .del { display: none; } /* 播出中的 Cue 不能刪除 */
 .cue .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; margin-left: 6px; font-weight: 600; }
 .cue.live .tag { background: var(--go); color: #fff; }
 .cue.next .tag { background: var(--next); color: #fff; }

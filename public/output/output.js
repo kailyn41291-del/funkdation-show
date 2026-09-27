@@ -60,6 +60,27 @@
     };
   }
 
+  // 同一組文字用同一個字級：先用設定字級量寬度，取最需要縮小的比例套用到全部
+  // items: [{ txt, x, y, maxW }]，回傳實際字級
+  function fitGroup(items, size) {
+    var key = [size, lookSig].concat(items.map(function (it) { return it.txt.t.textContent + '|' + Math.round(it.maxW); })).join('\n');
+    var memo = items[0] && items[0].txt;
+    if (memo && memo._fitKey === key) {
+      items.forEach(function (it) { px(it.txt.wrap, { left: it.x, top: it.y, fontSize: memo._fitSize }); });
+      return memo._fitSize;
+    }
+    var k = 1;
+    items.forEach(function (it) {
+      px(it.txt.wrap, { fontSize: size });
+      var w = it.txt.t.offsetWidth;
+      if (it.txt.t.textContent && it.maxW > 0 && w > it.maxW) k = Math.min(k, it.maxW / w);
+    });
+    var fs = +(size * k).toFixed(2);
+    items.forEach(function (it) { px(it.txt.wrap, { left: it.x, top: it.y, fontSize: fs }); });
+    if (memo) { memo._fitKey = key; memo._fitSize = fs; }
+    return fs;
+  }
+
   var FRAME_SVG = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 520" preserveAspectRatio="none">' +
     '<rect x="7" y="7" width="766" height="506" fill="none" stroke="#140707" stroke-width="14"/>' +
@@ -143,14 +164,19 @@
   // ---------- 字型與全域外觀 ----------
   var fontStyle = mk('style', '', document.head);
   var appliedFonts = '';
+  var lookSig = '';
   function applyLook() {
     var ev = S.event;
+    effectsOn = ev.effectsEnabled !== false;
+    var ls = [ev.ink, ev.light, ev.fontEn, ev.fontZh, ev.grain, JSON.stringify(ev.fonts || [])].join('|');
+    if (ls === lookSig) return;
+    lookSig = ls;
     var sig = JSON.stringify(ev.fonts || []);
     if (sig !== appliedFonts) {
       appliedFonts = sig;
       fontStyle.textContent = (ev.fonts || []).map(function (f) {
         return "@font-face{font-family:'" + f.name.replace(/'/g, '') + "';src:url('" + asset(f.url) + "');font-display:block;}";
-      }).join('\n') + '\n.grain .t{-webkit-mask-image:url(' + FX.noiseTexture('grain') + ');mask-image:url(' + FX.noiseTexture('grain') + ');}';
+      }).join('\n') + '\n.grain .t:not(.nomask),.grain .gm{-webkit-mask-image:url(' + FX.noiseTexture('grain') + ');mask-image:url(' + FX.noiseTexture('grain') + ');}';
     }
     stage.style.setProperty('--ink', ev.ink || '#140707');
     stage.style.setProperty('--light', ev.light || '#ece0c8');
@@ -372,14 +398,14 @@
       return t;
     }
     function positions() {
-      var v = sc.ctx.layout.v, w = v.w, m = mode(), xs = [], vsx = [0, 0];
+      var v = sc.ctx.layout.v, w = v.w, m = mode(), xs = [], vsx = [0, 0], close = Math.max(0, v.close);
       if (m === 'row') {
-        var tot = 4 * w + 3 * v.close, x0 = (W - tot) / 2;
-        for (var i = 0; i < 4; i++) xs.push(x0 + i * (w + v.close));
+        var tot = 4 * w + 3 * close, x0 = (W - tot) / 2;
+        for (var i = 0; i < 4; i++) xs.push(x0 + i * (w + close));
       } else {
         var pw = 2 * w + v.vsg, pc = [W / 2 - (pw + v.pg) / 2, W / 2 + (pw + v.pg) / 2];
         for (var p = 0; p < 2; p++) {
-          var g = (m === 'pair' || open[p]) ? v.vsg : v.close;
+          var g = (m === 'pair' || open[p]) ? v.vsg : close;
           xs[p * 2] = pc[p] - g / 2 - w;
           xs[p * 2 + 1] = pc[p] + g / 2;
           vsx[p] = pc[p];
@@ -397,10 +423,12 @@
         s.box.set(t, 0, 0, w, h, v.pad, sc.ctx.preview);
         s.en.text(t ? t.en : '');
         s.zh.text(FDM.line2(S, t));
-        var maxW = w + Math.max(0, mode() === 'row' ? v.close : Math.min(v.close, v.vsg)) - 12;
-        var es = s.en.at(w / 2, h + v.ng, v.ens, maxW);
-        s.zh.at(w / 2, h + v.ng + es + 10, v.zhs, maxW);
       });
+      // 四隊隊名用同一個字級（以最長的隊名為準縮小）
+      var gap = Math.max(0, mode() === 'row' ? v.close : Math.min(v.close, v.vsg));
+      var maxW = w + gap - 12;
+      var es = fitGroup(slots.map(function (s) { return { txt: s.en, x: w / 2, y: h + v.ng, maxW: maxW }; }), v.ens);
+      fitGroup(slots.map(function (s) { return { txt: s.zh, x: w / 2, y: h + v.ng + es + 10, maxW: maxW }; }), v.zhs);
       vs.forEach(function (e, p) {
         px(e, { left: P.vsx[p], top: v.top + h / 2, fontSize: v.vss });
         if (mode() === 'row') FX.hide(e);
@@ -465,6 +493,15 @@
       if (ev.name === 'top4next') next(ev.index);
       else if (ev.name === 'top4auto') auto();
       else if (ev.name === 'top4reset') hideAll();
+      else if (ev.name === 'top4view') {
+        // 編排時調整間距：顯示併排（尚未拉開）或拉開後的樣子
+        sc.restart();
+        shown = 4;
+        open = [!!ev.open, !!ev.open];
+        place();
+        slots.forEach(function (s) { ORDER.forEach(function (k) { FX.show(s.EL[k]); }); });
+        vs.forEach(function (e) { if (mode() !== 'row' && (mode() === 'pair' || ev.open)) FX.show(e); else FX.hide(e); });
+      }
       else if (ev.name === 'entrance') auto();
     };
     place();
@@ -500,9 +537,9 @@
     var sL = mk('span', '', scL), sR = mk('span', '', scR);
     var dv = mk('div', 'divider', sc.root);
     var tmB = mk('div', 'txt', sc.root);
-    var tmIn = mk('div', 't', tmB);
+    var tmIn = mk('div', 't nomask', tmB);
     tmIn.style.display = 'block';
-    var tlab = mk('div', 'en ls-lab', tmIn), tm = mk('div', 'en ls-tm', tmIn);
+    var tlab = mk('div', 'en ls-lab gm', tmIn), tm = mk('div', 'en ls-tm gm', tmIn);
     tlab.textContent = 'TIME';
     tm.style.display = 'inline-block';
     var sealL = mk('div', 'seal', sc.root), sealR = mk('div', 'seal', sc.root);
@@ -530,7 +567,15 @@
     }
     function sealSrc() {
       var s = sc.ctx.layout.seal;
-      return s.img ? asset(s.img) : FX.sealImage(s.text || '勝', s.ink, s.color, S.event.fontZh);
+      if (s.img) return asset(s.img);
+      var txt = s.text || '勝', font = '900 250px "' + (S.event.fontZh || 'Noto Serif TC') + '"';
+      if (document.fonts && document.fonts.check && !document.fonts.check(font, txt)) {
+        document.fonts.load(font, txt).then(function () {
+          FX.clearSealCache();
+          if (current && current.scene) current.scene.update(ctxFor(targetCue()), null);
+        }).catch(function () {});
+      }
+      return FX.sealImage(txt, s.ink, s.color, S.event.fontZh);
     }
     sc.update = function (c, meta) {
       sc.ctx = c;
@@ -539,13 +584,15 @@
       var tL = side(cue.left), tR = side(cue.right);
       pL.set(tL, xl, T, w, h, v.pad, c.preview && (!tL || tL._ph));
       pR.set(tR, xr, T, w, h, v.pad, c.preview && (!tR || tR._ph));
-      [[enL, zhL, tL, xl + w / 2], [enR, zhR, tR, xr + w / 2]].forEach(function (a) {
-        var t = a[2], maxW = w + Math.max(0, v.pd * 2 - 40);
+      var nameMax = Math.min(w + Math.max(0, v.pd * 2 - 40), W / 2 - 40);
+      [[enL, zhL, tL], [enR, zhR, tR]].forEach(function (a) {
+        var t = a[2];
         a[0].text(t ? t.en : '');
         a[1].text(t && t._ph ? t.tag : FDM.line2(S, t));
-        var es = a[0].at(a[3], T + h + v.ng, v.es, Math.min(maxW, W / 2 - 40));
-        a[1].at(a[3], T + h + v.ng + es + 14, v.zs, Math.min(maxW, W / 2 - 40));
       });
+      // 左右隊名用同一個字級
+      var es = fitGroup([{ txt: enL, x: xl + w / 2, y: T + h + v.ng, maxW: nameMax }, { txt: enR, x: xr + w / 2, y: T + h + v.ng, maxW: nameMax }], v.es);
+      fitGroup([{ txt: zhL, x: xl + w / 2, y: T + h + v.ng + es + 14, maxW: nameMax }, { txt: zhR, x: xr + w / 2, y: T + h + v.ng + es + 14, maxW: nameMax }], v.zs);
       px(hdr, { left: W / 2, top: v.hy });
       h1.style.fontSize = v.hs + 'px';
       h2.style.fontSize = Math.round(v.hs * 0.65) + 'px';
@@ -662,7 +709,8 @@
       else if (ev.name === 'round') {
         shownRound = ev.round;
         headers(ev.round);
-        if (effectsOn) hIn.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600 });
+        // 只有回合數淡入，FINAL／SEMI FINAL 等標題不動
+        if (effectsOn) [h2, h3b].forEach(function (el) { el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600 }); });
         if (shownSeal) { if (sc.ctx.layout.seal.autoFade) fadeSeal(); else { FX.hide(SEAL.l); FX.hide(SEAL.r); shownSeal = null; } }
       } else if (ev.name === 'testTimer') testUntil = Date.now() + (sc.ctx.layout.timer.warn + 2) * 1000;
       else if (ev.name === 'testScore') animScore('l', (shownScore.l || 0) + 1);
@@ -842,7 +890,10 @@
     var make = SCENES[cue ? cue.type : 'black'] || SCENES.black;
     var sc = make(ctx);
     applyBg(cue ? (cue.type === 'black' ? { mode: 'color', color: '#000', texture: false } : ctx.layout.bg) : { mode: 'color', color: '#000', texture: false }, !animated);
-    if (animated) sc.enter(); else sc.showStatic();
+    if (animated) {
+      // 等新畫面排版、圖片上傳到顯示卡後再開始動畫，第一格不會掉格
+      requestAnimationFrame(function () { requestAnimationFrame(function () { if (sc.root.isConnected) sc.enter(); }); });
+    } else sc.showStatic();
     return sc;
   }
 
@@ -935,12 +986,53 @@
     }
   }
 
+  // ---------- 預先準備（空閒時做，切換畫面時就不用臨時產生） ----------
+  var warmSig = '';
+  function prewarm() {
+    if (!S) return;
+    var ev = S.event, texts = [], sig;
+    S.teams.forEach(function (t) { texts.push(t.en, t.zh, t.tag); });
+    S.cues.forEach(function (c) { texts.push(c.title, c.zh); });
+    for (var k in S.layouts) {
+      var L = S.layouts[k];
+      if (L && L.text) for (var x in L.text) texts.push(L.text[x]);
+      if (L && L.seal) texts.push(L.seal.text);
+    }
+    texts.push('TIME ROUND VS 0123456789: 第一二三四五六七八九十回合');
+    var all = texts.filter(Boolean).join(' ');
+    sig = all + '|' + ev.fontEn + '|' + ev.fontZh;
+    if (sig === warmSig) return;
+    warmSig = sig;
+    var idle = window.requestIdleCallback || function (f) { return setTimeout(f, 200); };
+    idle(function () {
+      // 產生紙紋並先解碼，第一次顯示時不會卡
+      ['paper', 'grain'].forEach(function (k) {
+        var im = new Image();
+        im.src = FX.noiseTexture(k);
+        if (im.decode) im.decode().catch(function () {});
+        preloaded['tex:' + k] = im;
+      });
+    });
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load('900 64px "' + (ev.fontEn || 'Cinzel') + '"', all).catch(function () {});
+      document.fonts.load('900 64px "' + (ev.fontZh || 'Noto Serif TC') + '"', all).catch(function () {});
+      document.fonts.load('700 64px "' + (ev.fontEn || 'Cinzel') + '"', all).catch(function () {});
+    }
+    idle(function () {
+      for (var k in S.layouts) {
+        var L = S.layouts[k];
+        if (L && L.seal && !L.seal.img) FX.sealImage(L.seal.text || '勝', L.seal.ink, L.seal.color, ev.fontZh);
+      }
+    });
+  }
+
   // ---------- 連線 ----------
   var fd = window.fd = FD.connect({
     onState: function (state, rev, reason, meta) {
       S = state;
       document.getElementById('offline').style.display = 'none';
       render(meta);
+      prewarm();
     },
     onEvent: function (ev) {
       if (PREVIEW || !current || !current.scene) return;
@@ -966,7 +1058,7 @@
 
   // 字型載入後重新排版（比分置中需要量測字形）
   if (document.fonts) {
-    var refont = function () { FX.clearSealCache(); if (S && current && current.scene) current.scene.update(ctxFor(targetCue()), null); };
+    var refont = function () { if (S && current && current.scene) current.scene.update(ctxFor(targetCue()), null); };
     document.fonts.ready.then(refont);
     document.fonts.addEventListener && document.fonts.addEventListener('loadingdone', refont);
   }

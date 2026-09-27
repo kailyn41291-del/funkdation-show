@@ -9,7 +9,7 @@ body.monitor { cursor: default; }
   --fen: 'Cinzel', 'Noto Serif TC', serif;
   --fzh: 'Noto Serif TC', serif;
 }
-.bg { position: absolute; inset: 0; opacity: 0; transition: opacity .45s ease; background-size: cover; background-position: center; }
+.bg { position: absolute; inset: 0; opacity: 0; will-change: opacity; transition: opacity .45s ease; background-size: cover; background-position: center; }
 .bg.on { opacity: 1; }
 .bg video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; }
 .bg .tex { position: absolute; inset: 0; background-size: 100% 100%; opacity: .9; pointer-events: none; }
@@ -36,7 +36,8 @@ body.monitor { cursor: default; }
 .ls-tm { letter-spacing: .06em; padding-left: .06em; }
 .ls-lead { letter-spacing: .14em; padding-left: .14em; }
 .ls-title { letter-spacing: .34em; padding-left: .34em; }
-.grain .t { -webkit-mask-size: 3.4em 3.4em; mask-size: 3.4em 3.4em; }
+.grain .t, .grain .gm { -webkit-mask-size: 3.4em 3.4em; mask-size: 3.4em 3.4em; }
+.gm { display: block; }
 
 .pbox { position: absolute; }
 .pbox .ph { position: absolute; overflow: hidden; opacity: 0; }
