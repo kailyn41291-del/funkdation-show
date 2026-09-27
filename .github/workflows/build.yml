@@ -1,0 +1,83 @@
+# 在真的 Windows 與 Mac 電腦上打包，並發布到 Releases 下載頁
+# 觸發：推送 v 開頭的標籤（例如 v1.0.1），或在 Actions 頁手動執行
+name: 打包安裝檔
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx electron-builder --win --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/*-Windows-Setup.exe
+            dist/*-Windows-Portable.exe
+
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx electron-builder --mac --x64 --arm64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      # 沒有 Apple 開發者憑證：用 ad-hoc 簽章，Apple 晶片的 Mac 才能執行
+      - name: 簽章並壓縮
+        run: |
+          VER=$(node -p "require('./package.json').version")
+          for pair in "mac-arm64:AppleSilicon" "mac:Intel"; do
+            dir=${pair%%:*}; name=${pair##*:}
+            codesign --force --deep --sign - "dist/$dir/FUNKDATION.app"
+            codesign --verify --deep --strict "dist/$dir/FUNKDATION.app"
+            cp build/mac-install.txt "dist/$dir/先看我-安裝說明.txt"
+            (cd "dist/$dir" && zip -qry "../FUNKDATION-$VER-Mac-$name.zip" FUNKDATION.app 先看我-安裝說明.txt)
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: dist/*-Mac-*.zip
+
+  release:
+    needs: [windows, mac]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: 發布下載頁
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
+          name: FUNKDATION 播出系統 ${{ github.ref_type == 'tag' && github.ref_name || format('build {0}', github.run_number) }}
+          files: out/*
+          body: |
+            ## 下載哪一個？
+            - **Windows**：`Windows-Setup.exe`（安裝版）或 `Windows-Portable.exe`（免安裝，直接開）
+            - **Mac（M1／M2／M3／M4）**：`Mac-AppleSilicon.zip`
+            - **Mac（Intel）**：`Mac-Intel.zip`
+
+            ## 第一次開啟
+            - **Windows** 出現「Windows 已保護您的電腦」：按「其他資訊」→「仍要執行」。
+            - **Mac** 被擋下：到「系統設定 → 隱私權與安全性」往下捲，按「強制打開」。若顯示「已損毀」，在終端機執行 `xattr -cr /Applications/FUNKDATION.app`。
