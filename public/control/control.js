@@ -994,7 +994,7 @@
     add(pane, [h('h3', { text: '照片' }),
       sl(v.concat('w'), '照片寬度', 100, 900), sl(v.concat('top'), '垂直位置', -300, 1000), sl(v.concat('pad'), '框內邊距', 0, 300),
       h('h3', { text: '間距' }),
-      sl(v.concat('close'), '併排間距', 0, 400, { after: function () { post({ name: 'top4view', open: false }); } }),
+      sl(v.concat('close'), '併排間距', 12, 400, { after: function () { post({ name: 'top4view', open: false }); } }),
       sl(v.concat('vsg'), '拉開間距', 0, 600, { after: function () { post({ name: 'top4view', open: true }); } }),
       sl(v.concat('pg'), '兩組距離', -200, 800, { after: function () { post({ name: 'top4view', open: true }); } }),
       h('div', { class: 'hint', text: '調整「併排間距」時預覽會顯示兩隊剛出現、還沒拉開的樣子；調整「拉開間距」會顯示拉開後的樣子。' }),

@@ -120,7 +120,7 @@
     ], { duration: 300 });
   }
 
-  // 登場
+  // 登場（位移、縮放用獨立的 translate／scale 屬性，不會蓋掉元素本身置中用的 transform）
   function run(el, fx, dur, tl) {
     if (!el) return;
     cancel(el);
@@ -129,14 +129,14 @@
     if (fx === 'ink' || fx === 'brush') { clipAnim(el, fx, dur, tl, false); return; }
     if (fx === 'fade') { el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur, easing: CSS_EASE }); return; }
     if (fx === 'slide') {
-      el.animate([{ transform: 'translateY(50px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: dur, easing: CSS_EASE });
+      el.animate([{ translate: '0 50px', opacity: 0 }, { translate: '0 0', opacity: 1 }], { duration: dur, easing: CSS_EASE });
       return;
     }
     if (fx === 'slam') {
       el.animate([
-        { transform: 'scale(1.7)', opacity: 0 },
-        { transform: 'scale(.97)', opacity: 1, offset: 0.6 },
-        { transform: 'scale(1)', opacity: 1 }
+        { scale: '1.7', opacity: 0 },
+        { scale: '.97', opacity: 1, offset: 0.6 },
+        { scale: '1', opacity: 1 }
       ], { duration: dur, easing: 'cubic-bezier(.5,0,.75,0)' });
       var id = setTimeout(function () { if (!tl || tl.alive) shake(1); }, dur * 0.6);
       if (tl) tl.timers.push(id);

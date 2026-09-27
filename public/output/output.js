@@ -398,7 +398,7 @@
       return t;
     }
     function positions() {
-      var v = sc.ctx.layout.v, w = v.w, m = mode(), xs = [], vsx = [0, 0], close = Math.max(0, v.close);
+      var v = sc.ctx.layout.v, w = v.w, m = mode(), xs = [], vsx = [0, 0], close = Math.max(12, v.close);
       if (m === 'row') {
         var tot = 4 * w + 3 * close, x0 = (W - tot) / 2;
         for (var i = 0; i < 4; i++) xs.push(x0 + i * (w + close));
@@ -425,7 +425,7 @@
         s.zh.text(FDM.line2(S, t));
       });
       // 四隊隊名用同一個字級（以最長的隊名為準縮小）
-      var gap = Math.max(0, mode() === 'row' ? v.close : Math.min(v.close, v.vsg));
+      var gap = Math.max(12, mode() === 'row' ? v.close : Math.min(v.close, v.vsg));
       var maxW = w + gap - 12;
       var es = fitGroup(slots.map(function (s) { return { txt: s.en, x: w / 2, y: h + v.ng, maxW: maxW }; }), v.ens);
       fitGroup(slots.map(function (s) { return { txt: s.zh, x: w / 2, y: h + v.ng + es + 10, maxW: maxW }; }), v.zhs);
