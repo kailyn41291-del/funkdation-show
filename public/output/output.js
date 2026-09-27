@@ -31,6 +31,27 @@
   addEventListener('resize', fit);
   fit();
 
+  // ---------- OBS 尺寸檢查 ----------
+  // OBS 瀏覽器來源預設 800×600，會先畫小再放大成 1920×1080，整個畫面變糊。
+  // 在 OBS 裡偵測到尺寸不足時，角落顯示提醒（尺寸改對就自動消失）。
+  var obsWarn = null;
+  function checkObs() {
+    if (!window.obsstudio || MONITOR) return;
+    var dpr = window.devicePixelRatio || 1;
+    var rw = Math.round(innerWidth * dpr), rh = Math.round(innerHeight * dpr);
+    var bad = rw < W - 2 || rh < H - 2;
+    if (bad && !obsWarn) {
+      obsWarn = mk('div', 'obswarn', document.body);
+    }
+    if (obsWarn) {
+      obsWarn.style.display = bad ? '' : 'none';
+      obsWarn.innerHTML = '<b class="h">畫質不足：OBS 來源尺寸 ' + rw + '×' + rh + '</b>' +
+        '在 OBS 對這個瀏覽器來源按右鍵 →「屬性」，把<b>寬度設 1920、高度設 1080</b>，畫面才會清楚。<br>改好後這個提醒會自動消失。';
+    }
+  }
+  addEventListener('resize', checkObs);
+  setTimeout(checkObs, 0);
+
   // ---------- 小工具 ----------
   function mk(tag, cls, parent) {
     var e = document.createElement(tag);

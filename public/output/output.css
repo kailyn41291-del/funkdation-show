@@ -61,3 +61,7 @@ body.monitor { cursor: default; }
 #offline { position: fixed; left: 12px; bottom: 12px; padding: 6px 12px; background: rgba(0,0,0,.7); color: #fff;
   font: 14px system-ui, sans-serif; border-radius: 6px; display: none; }
 body.monitor #offline { display: none !important; }
+
+/* OBS 尺寸不足提醒 */
+.obswarn { position: fixed; left: 2%; top: 3%; z-index: 99; max-width: 70%; padding: 2.2vh 2.6vh; border-radius: 1vh; background: #ffd23f; color: #1a0f00; font: 700 2.8vh/1.5 'Noto Serif TC', sans-serif; box-shadow: 0 0 0 .5vh #1a0f00; cursor: default; }
+.obswarn .h { display: block; font-size: 3.4vh; margin-bottom: .6vh; }

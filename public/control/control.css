@@ -188,3 +188,6 @@ table.grid input[type=text] { width: 100%; }
 .updbox .ubar { height: 6px; background: #3a2d2a; border-radius: 3px; overflow: hidden; }
 .updbox .ubar div { height: 100%; width: 0; background: #e2503c; transition: width .15s linear; }
 .updbox .us { margin-top: 6px; font-size: 12px; }
+
+.obssteps { margin: 8px 0 4px; padding-left: 22px; line-height: 1.8; }
+.obssteps b { color: var(--go); }
