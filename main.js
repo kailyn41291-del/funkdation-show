@@ -9,6 +9,8 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+// 比賽現場常沒有網路：不做元件更新檢查
+app.commandLine.appendSwitch('disable-component-update');
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
