@@ -1,10 +1,12 @@
 # 在真的 Windows 與 Mac 電腦上打包，並發布到 Releases 下載頁
-# 觸發：推送 v 開頭的標籤（例如 v1.0.1），或在 Actions 頁手動執行
+# 觸發：推送到 main、推送 v 開頭的標籤，或在 Actions 頁手動執行
 name: 打包安裝檔
 
 on:
   push:
+    branches: [main]
     tags: ['v*']
+    paths-ignore: ['README.md', 'test/**']
   workflow_dispatch:
 
 permissions:
@@ -69,8 +71,9 @@ jobs:
       - name: 發布下載頁
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
-          name: FUNKDATION 播出系統 ${{ github.ref_type == 'tag' && github.ref_name || format('build {0}', github.run_number) }}
+          make_latest: true
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.run_number) }}
+          name: FUNKDATION 播出系統 ${{ github.ref_type == 'tag' && github.ref_name || format('第 {0} 版', github.run_number) }}
           files: out/*
           body: |
             ## 下載哪一個？
