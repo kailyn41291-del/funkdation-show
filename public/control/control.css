@@ -182,3 +182,9 @@ table.grid input[type=text] { width: 100%; }
   .col.cues { max-height: 420px; }
   header { flex-wrap: wrap; height: auto; padding: 8px; }
 }
+
+.updbox { position: fixed; right: 16px; bottom: 16px; width: 320px; padding: 14px 16px; background: #221a18; border: 1px solid #4a3a36; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.5); z-index: 50; display: none; }
+.updbox .ut { font-weight: 600; margin-bottom: 8px; }
+.updbox .ubar { height: 6px; background: #3a2d2a; border-radius: 3px; overflow: hidden; }
+.updbox .ubar div { height: 100%; width: 0; background: #e2503c; transition: width .15s linear; }
+.updbox .us { margin-top: 6px; font-size: 12px; }

@@ -9,5 +9,8 @@ contextBridge.exposeInMainWorld('funk', {
   displays: () => ipcRenderer.invoke('fd:displays'),
   openOutput: (id, fullscreen) => ipcRenderer.invoke('fd:openOutput', id, fullscreen),
   closeOutput: () => ipcRenderer.invoke('fd:closeOutput'),
-  openDataFolder: () => ipcRenderer.invoke('fd:openDataFolder')
+  openDataFolder: () => ipcRenderer.invoke('fd:openDataFolder'),
+  version: () => ipcRenderer.invoke('fd:version'),
+  checkUpdate: () => ipcRenderer.invoke('fd:checkUpdate'),
+  onUpdate: cb => ipcRenderer.on('fd:update', (e, msg) => cb(msg))
 });

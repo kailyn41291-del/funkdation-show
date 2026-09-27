@@ -1344,6 +1344,13 @@
           toast('已清除比賽結果');
         }).catch(fail);
       } })),
+      window.funk && window.funk.checkUpdate ? [
+        h('h3', { text: '版本與更新' }),
+        h('div', { class: 'btnrow', style: 'align-items:center' },
+          h('span', { id: 'appver', class: 'muted', text: '目前版本 …' }),
+          h('button', { text: '檢查更新', onclick: function () { toast('正在檢查更新…'); window.funk.checkUpdate(); } })),
+        h('div', { class: 'hint', text: '程式啟動時會自動檢查；有新版本時會詢問是否下載並更新。更新不會動到賽事資料。演出進行中請不要更新。' })
+      ] : null,
       h('h3', { text: '關於' }),
       h('div', { class: 'faint', html: 'FUNKDATION VOL.4 賽事播出系統<br>內建字型 Cinzel、Noto Serif TC 以 SIL Open Font License 授權。' })
     ]);
@@ -1366,6 +1373,7 @@
       }).catch(fail);
     }
     loadBackups();
+    if (window.funk && window.funk.version) window.funk.version().then(function (v) { var el = document.getElementById('appver'); if (el) el.textContent = '目前版本 ' + v; });
     // 桌面版：輸出視窗控制
     if (window.funk) {
       window.funk.displays().then(function (list) {
@@ -1405,4 +1413,28 @@
   setInterval(function () { if (S && ui.mode === 'show') liveUpdaters.forEach(function (f) { try { f(); } catch (e) { /* 忽略 */ } }); }, 500);
 
   window.addEventListener('beforeunload', flush);
+
+  // 程式更新進度
+  if (window.funk && window.funk.onUpdate) {
+    window.funk.onUpdate(function (m) {
+      var box = document.getElementById('updbox');
+      if (!box) {
+        box = h('div', { id: 'updbox', class: 'updbox' }, h('div', { class: 'ut' }), h('div', { class: 'ubar' }, h('div')), h('div', { class: 'us faint' }));
+        document.body.appendChild(box);
+      }
+      var t = box.querySelector('.ut'), bar = box.querySelector('.ubar div'), sub = box.querySelector('.us');
+      box.style.display = 'block';
+      if (m.state === 'downloading') {
+        t.textContent = '正在下載新版本' + (m.version ? ' ' + m.version : '') + '…';
+        bar.style.width = Math.round((m.progress || 0) * 100) + '%';
+        sub.textContent = m.total ? (m.got / 1048576).toFixed(0) + ' / ' + (m.total / 1048576).toFixed(0) + ' MB' : '';
+      } else if (m.state === 'installing') {
+        t.textContent = '下載完成，正在安裝…';
+        bar.style.width = '100%';
+        sub.textContent = '程式會自動關閉並重新開啟';
+      } else if (m.state === 'error') {
+        box.style.display = 'none';
+      }
+    });
+  }
 })();

@@ -40,6 +40,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "updater.js",
       "server.js",
       "store.js",
       "default-state.js",

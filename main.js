@@ -3,6 +3,7 @@
 const { app, BrowserWindow, Menu, screen, ipcMain, shell, dialog, powerSaveBlocker } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const updater = require('./updater');
 
 // 讓輸出視窗在沒有焦點時也維持 60fps、影片可自動播放聲音
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
@@ -177,6 +178,8 @@ ipcMain.handle('fd:displays', () => displayList());
 ipcMain.handle('fd:openOutput', (e, id, fs) => { openOutput(id, fs !== false); return true; });
 ipcMain.handle('fd:closeOutput', () => { closeOutput(); return true; });
 ipcMain.handle('fd:openDataFolder', () => shell.openPath(DATA_DIR));
+ipcMain.handle('fd:version', () => app.getVersion());
+ipcMain.handle('fd:checkUpdate', () => updater.prompt(true));
 
 app.on('second-instance', () => {
   if (control) { if (control.isMinimized()) control.restore(); control.focus(); }
@@ -194,6 +197,7 @@ app.whenReady().then(async () => {
   sleepBlock = powerSaveBlocker.start('prevent-display-sleep');
   buildMenu();
   createControl();
+  updater.init({ getWindow: () => control });
   screen.on('display-added', buildMenu);
   screen.on('display-removed', buildMenu);
 });
