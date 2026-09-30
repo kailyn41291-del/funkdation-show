@@ -32,6 +32,18 @@ function defaultLayouts() {
       v: { pw: 840, px: 0, pt: 180, pad: 40, ng: 44, es: 76, zs: 36, lg: 18 },
       anim: { duration: 500, overlap: 60, steps: { fr: step('fade'), ph: step('ink'), en: step('brush'), zh: step('brush') } }
     },
+    judge: {
+      bg: bg(),
+      intro: true,
+      ratio: '3:2',
+      text: { lead: 'NEXT JUDGE IS...', leadZh: '下一位評審', title: 'JUDGE' },
+      v: { pw: 760, px: 0, pt: 230, pad: 40, ng: 40, es: 76, zs: 36, lg: 18, tS: 34, tG: 30, lEs: 96, lZs: 40, lY: 440, lG: 28 },
+      anim: {
+        duration: 500, overlap: 60,
+        steps: { lt: step('ink'), lz: step('ink'), fr: step('fade'), ph: step('ink'), en: step('brush'), zh: step('brush'), tt: step('ink') }
+      },
+      pause: 1500, leadOut: 'fade'
+    },
     top4: {
       bg: bg(),
       mode: 'step',
@@ -129,6 +141,10 @@ function defaultState() {
     frame: null,
     teams: TEAM_LIST.map(([id, en, tag, seed]) => ({
       id, en, zh: '', tag, seed,
+      photo: { src: null, trim: null, fit: 'auto', zoom: 100, x: 0, y: 0 }
+    })),
+    judges: [1, 2, 3].map(n => ({
+      id: 'j' + n, en: 'JUDGE ' + n, zh: '', tag: '',
       photo: { src: null, trim: null, fit: 'auto', zoom: 100, x: 0, y: 0 }
     })),
     sponsors: {

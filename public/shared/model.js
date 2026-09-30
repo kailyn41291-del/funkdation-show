@@ -14,6 +14,7 @@
     idle: '主視覺待機',
     overview: '九隊總覽',
     team: '單隊展示',
+    judge: '評審表演',
     top4: '四強公布',
     battle: '對戰計分',
     champ: '冠亞軍公布',
@@ -31,6 +32,12 @@
   function teamById(state, id) {
     if (!state || !id) return null;
     for (var i = 0; i < state.teams.length; i++) if (state.teams[i].id === id) return state.teams[i];
+    return null;
+  }
+
+  function judgeById(state, id) {
+    if (!state || !id || !state.judges) return null;
+    for (var i = 0; i < state.judges.length; i++) if (state.judges[i].id === id) return state.judges[i];
     return null;
   }
 
@@ -72,11 +79,16 @@
       var t = teamById(state, cue.team);
       return t ? t.en : '（未選隊伍）';
     }
+    if (cue.type === 'judge') {
+      var j = judgeById(state, cue.judge);
+      return j ? j.en : '（未選評審）';
+    }
     return cue.name || TYPES[cue.type] || cue.type;
   }
 
   function cueSub(state, cue) {
     if (cue.type === 'team') return TYPES.team;
+    if (cue.type === 'judge') return TYPES.judge;
     if (cue.type === 'battle') {
       var l = resolve(state, cue.left), r = resolve(state, cue.right);
       return (l ? l.en : sourceLabel(cue.left)) + ' vs ' + (r ? r.en : sourceLabel(cue.right));
@@ -125,6 +137,10 @@
   };
   var PRESET_FX = {
     team: { std: { fr: 'fade', ph: 'ink', en: 'brush', zh: 'brush' }, sharp: { fr: 'slam', ph: 'slide', en: 'slide', zh: 'slide' } },
+    judge: {
+      std: { lt: 'ink', lz: 'ink', fr: 'fade', ph: 'ink', en: 'brush', zh: 'brush', tt: 'ink' },
+      sharp: { lt: 'slam', lz: 'slide', fr: 'slam', ph: 'slide', en: 'slide', zh: 'slide', tt: 'slam' }
+    },
     top4: { std: { fr: 'fade', ph: 'ink', en: 'brush', zh: 'brush' }, sharp: { fr: 'slam', ph: 'slide', en: 'slide', zh: 'slide' } },
     battle: { std: { fr: 'fade', ph: 'ink', nm: 'brush', info: 'fade' }, sharp: { fr: 'slam', ph: 'slide', nm: 'slide', info: 'fade' } },
     champ: {
@@ -153,7 +169,7 @@
 
   global.FDM = {
     zhNum: zhNum, TYPES: TYPES, BATTLES: BATTLES, FX_IN: FX_IN, FX_OUT: FX_OUT,
-    teamById: teamById, battleCue: battleCue, resolve: resolve, sourceLabel: sourceLabel,
+    teamById: teamById, judgeById: judgeById, battleCue: battleCue, resolve: resolve, sourceLabel: sourceLabel,
     cueTitle: cueTitle, cueSub: cueSub, layoutKey: layoutKey, layoutFor: layoutFor,
     chain: chain, PRESETS: PRESETS, presetAnim: presetAnim, line2: line2
   };

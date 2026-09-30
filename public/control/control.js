@@ -48,7 +48,7 @@
   // 狀態與連線
   // ---------------------------------------------------------------------------
   var S = null, D = null;
-  var ui = Object.assign({ page: 'flow', mode: 'edit', sel: null, tabs: {}, photoSide: 'L', team: 't1', guides: { safe: false, lines: false } },
+  var ui = Object.assign({ page: 'flow', mode: 'edit', sel: null, tabs: {}, photoSide: 'L', team: 't1', judge: 'j1', guides: { safe: false, lines: false } },
     (function () { try { return JSON.parse(localStorage.getItem('fd-ui') || '{}'); } catch (e) { return {}; } })());
   function saveUi() { try { localStorage.setItem('fd-ui', JSON.stringify(ui)); } catch (e) { /* 忽略 */ } }
 
@@ -271,7 +271,7 @@
     renderHeader();
     renderPage(false);
   }
-  var PAGES = [['flow', '流程'], ['teams', '隊伍'], ['sponsors', '贊助商'], ['assets', '素材與字型'], ['settings', '設定']];
+  var PAGES = [['flow', '流程'], ['teams', '隊伍'], ['judges', '評審'], ['sponsors', '贊助商'], ['assets', '素材與字型'], ['settings', '設定']];
   function renderHeader() {
     headerEl.innerHTML = '';
     add(headerEl, [
@@ -329,7 +329,7 @@
       monitors = [];
       var page = h('div', { class: 'page' });
       mainEl.appendChild(page);
-      ({ teams: pageTeams, sponsors: pageSponsors, assets: pageAssets, settings: pageSettings })[ui.page](page);
+      ({ teams: pageTeams, judges: pageJudges, sponsors: pageSponsors, assets: pageAssets, settings: pageSettings })[ui.page](page);
       page.scrollTop = y;
     }
     refreshLive();
@@ -471,34 +471,43 @@
   function newCue(type, team) {
     var c = { id: uid(), type: type };
     if (type === 'team') c.team = team;
+    if (type === 'judge') c.judge = team;
     if (type === 'battle') Object.assign(c, { battle: 'semi1', name: '四強對戰 1', left: { source: 'top4', index: 0 }, right: { source: 'top4', index: 1 }, title: 'SEMI FINAL', zh: '四強賽', rounds: 4, seconds: 60, own: false });
     if (type === 'champ') Object.assign(c, { name: '冠亞軍公布', champ: { source: 'winner', battle: 'final' }, runner: { source: 'loser', battle: 'final' } });
     if (['idle', 'overview', 'top4', 'black'].indexOf(type) >= 0) c.name = FDM.TYPES[type];
     return c;
   }
-  var addState = { type: 'team', team: 't1', after: true };
+  var addState = { type: 'team', team: 't1', judge: 'j1', after: true };
   function addBar() {
     var teamSel = sel(S.teams.map(function (t, i) { return [t.id, (i + 1) + '. ' + t.en]; }), addState.team, function (v) { addState.team = v; });
-    teamSel.style.display = addState.type === 'team' ? '' : 'none';
-    var typeSel = sel(Object.keys(FDM.TYPES).map(function (k) { return [k, FDM.TYPES[k]]; }), addState.type, function (v) {
-      addState.type = v; teamSel.style.display = v === 'team' ? '' : 'none';
-    });
+    var judges = S.judges || [];
+    if (!FDM.judgeById(S, addState.judge) && judges[0]) addState.judge = judges[0].id;
+    var judgeSel = sel(judges.length ? judges.map(function (j, i) { return [j.id, (i + 1) + '. ' + j.en]; }) : [['', '（請先到「評審」頁新增）']], addState.judge, function (v) { addState.judge = v; });
+    function vis() { teamSel.style.display = addState.type === 'team' ? '' : 'none'; judgeSel.style.display = addState.type === 'judge' ? '' : 'none'; }
+    var typeSel = sel(Object.keys(FDM.TYPES).map(function (k) { return [k, FDM.TYPES[k]]; }), addState.type, function (v) { addState.type = v; vis(); });
+    vis();
     function insertAt() {
       if (ui.mode === 'show') return addState.after && S.show.cueId ? cueIndex(S.show.cueId) + 1 : S.cues.length;
       var i = cueIndex(ui.sel);
       return i >= 0 ? i + 1 : S.cues.length;
     }
     return h('div', { class: 'addbar' },
-      h('div', { class: 'row' }, typeSel, teamSel),
+      h('div', { class: 'row' }, typeSel, teamSel, judgeSel),
       h('div', { class: 'row' },
         h('button', { class: 'primary', text: '＋ 新增 Cue', style: 'flex:1', onclick: function () {
-          var a = clone(S.cues), c = newCue(addState.type, addState.team); a.splice(insertAt(), 0, c);
+          var a = clone(S.cues), c = newCue(addState.type, addState.type === 'judge' ? addState.judge : addState.team); a.splice(insertAt(), 0, c);
           if (ui.mode === 'edit') ui.sel = c.id;
           setCues(a); renderInspector();
         } }),
         h('button', { text: '產生 9 隊', title: '依隊伍順序一次新增所有單隊展示 Cue', onclick: function () {
           var a = clone(S.cues), at = insertAt();
           a.splice.apply(a, [at, 0].concat(S.teams.map(function (t) { return newCue('team', t.id); })));
+          setCues(a);
+        } }),
+        h('button', { text: '產生評審', title: '依評審順序一次新增所有評審表演 Cue', onclick: function () {
+          if (!judges.length) { toast('還沒有評審，請先到「評審」頁新增', true); return; }
+          var a = clone(S.cues), at = insertAt();
+          a.splice.apply(a, [at, 0].concat(judges.map(function (j) { return newCue('judge', j.id); })));
           setCues(a);
         } })),
       ui.mode === 'show' ? h('label', { style: 'font-size:12px' }, (function () {
@@ -595,7 +604,7 @@
   // ---------- 快捷鍵 ----------
   function shortcutHelp() {
     return '<b>快捷鍵</b>　<span class="kbd">空白</span> GO　<span class="kbd">B</span> 黑畫面<br>' +
-      '單隊：<span class="kbd">X</span> 退場<br>' +
+      '單隊／評審：<span class="kbd">X</span> 退場<br>' +
       '對戰：<span class="kbd">T</span> 計時開始／暫停　<span class="kbd">R</span> 重置　<span class="kbd">←</span><span class="kbd">→</span> 印章　<span class="kbd">↓</span> 印章淡出<br>' +
       '冠亞軍：<span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span> 揭曉　<span class="kbd">Q</span><span class="kbd">W</span><span class="kbd">E</span> 直接切換　<span class="kbd">Esc</span> 回底圖';
   }
@@ -606,7 +615,7 @@
     var c = liveCue(), k = e.key.toLowerCase(), handled = true;
     if (e.code === 'Space') go();
     else if (k === 'b') toggleBlack();
-    else if (c && c.type === 'team' && k === 'x') teamExit();
+    else if (c && (c.type === 'team' || c.type === 'judge') && k === 'x') teamExit();
     else if (c && c.type === 'battle' && k === 't') timerToggle();
     else if (c && c.type === 'battle' && k === 'r') timerReset();
     else if (c && c.type === 'battle' && e.key === 'ArrowLeft') seal(c, 'l');
@@ -663,6 +672,12 @@
         h('button', { text: '重播登場', onclick: replay }),
         h('button', { class: 'primary', text: '退場（X）', onclick: teamExit })),
       h('div', { class: 'hint', text: '退場後畫面回到乾淨底圖，再按 GO 播下一隊。沒按退場直接 GO，系統會自動先退場。' })]);
+    } else if (c.type === 'judge') {
+      add(pane, [h('h3', { text: '評審表演' }), h('div', { class: 'btnrow' },
+        h('button', { text: '重播（含懸念文字）', onclick: replay }),
+        h('button', { text: '直接顯示評審', title: '跳過 NEXT JUDGE IS... 直接出場', onclick: function () { cmd([set(['show', 'teamOut'], false)], { name: 'judgeDirect' }); } }),
+        h('button', { class: 'primary', text: '退場（X）', onclick: teamExit })),
+      h('div', { class: 'hint', text: '按 GO 播到這個 Cue 時會先出現懸念文字，停頓後評審登場。表演結束按退場，或直接 GO 下一個。' })]);
     } else if (c.type === 'top4') top4Panel(pane);
     else if (c.type === 'battle') battlePanel(pane, c);
     else if (c.type === 'champ') champPanel(pane, c);
@@ -819,6 +834,7 @@
     var btns = [];
     if (c) {
       if (c.type === 'team') btns = [['登場', { name: 'entrance' }], ['退場', { name: 'teamExit' }]];
+      if (c.type === 'judge') btns = [['登場（含懸念）', { name: 'entrance' }], ['直接登場', { name: 'judgeDirect' }], ['退場', { name: 'teamExit' }]];
       if (c.type === 'top4') btns = [['自動揭曉', { name: 'top4auto' }], ['重置', { name: 'top4reset' }]];
       if (c.type === 'battle') btns = [['登場', { name: 'entrance' }], ['左方印章', { name: 'seal', side: 'l' }], ['右方印章', { name: 'seal', side: 'r' }], ['印章淡出', { name: 'sealFade' }], ['最後 10 秒', { name: 'testTimer' }], ['比分變化', { name: 'testScore' }]];
       if (c.type === 'champ') btns = [['亞軍揭曉', { name: 'champReveal', k: 'r' }], ['冠軍揭曉', { name: 'champReveal', k: 'c' }], ['同框揭曉', { name: 'champDuo' }], null,
@@ -845,6 +861,7 @@
 
   var TABS = {
     team: [['basic', '基本'], ['photo', '照片'], ['layout', '版面'], ['anim', '動畫']],
+    judge: [['basic', '基本'], ['text', '文字'], ['photo', '照片'], ['layout', '版面'], ['anim', '動畫']],
     top4: [['basic', '基本'], ['layout', '版面'], ['anim', '動畫']],
     battle: [['basic', '基本'], ['photo', '照片'], ['layout', '版面'], ['anim', '動畫'], ['seal', '印章與計時']],
     champ: [['basic', '基本'], ['text', '內容'], ['layout', '版面'], ['anim', '動畫']],
@@ -868,6 +885,7 @@
     if (c.type === 'battle' && c.own && !S.layouts[lk]) setPath(lp, clone(S.layouts.battle));
     var editors = {
       team: { basic: teamBasic, photo: function (p) { photoTab(p, [c.team]); }, layout: teamLayout, anim: function (p) { animEditor(p, lp.concat('anim'), 'team', [['fr', '外框'], ['ph', '照片'], ['en', '英文隊名'], ['zh', '第二行']]); } },
+      judge: { basic: judgeBasic, text: judgeText, photo: judgePhoto, layout: judgeLayout, anim: judgeAnim },
       top4: { basic: top4Basic, layout: top4Layout, anim: top4Anim },
       battle: { basic: battleBasic, photo: battlePhoto, layout: battleLayout, anim: battleAnim, seal: battleSeal },
       champ: { basic: champBasic, text: champText, layout: champLayout, anim: champAnim },
@@ -957,8 +975,8 @@
     photoEditor(pane, t, function () { renderInspector(); });
     add(pane, h('div', { class: 'hint', text: '照片設定存在隊伍資料上，單隊展示、四強、對戰、冠亞軍都會沿用。' }));
   }
-  function photoEditor(pane, t, redraw) {
-    var ti = S.teams.indexOf(t), pp = ['teams', ti, 'photo'];
+  function photoEditor(pane, t, redraw, pp) {
+    pp = pp || ['teams', S.teams.indexOf(t), 'photo'];
     var ph = t.photo;
     add(pane, [h('h3', { text: t.en + ' 的照片' }),
       h('div', { class: 'btnrow', style: 'align-items:center' },
@@ -980,6 +998,62 @@
       sl(pp.concat('y'), '上下位置', -900, 900, { def: 0 }),
       fld('出框', chk('允許人物超出外框（去背照片適用）', pp.concat('free'))),
       ph.fit === 'auto' && ph.src && !ph.trim ? h('div', { class: 'hint', text: '這張照片沒有透明背景，自動 Fit 會以完整顯示處理。' }) : null]);
+  }
+
+  // ---------- 評審表演 ----------
+  function judgeOptions() {
+    var js = S.judges || [];
+    return js.length ? js.map(function (j, i) { return [j.id, (i + 1) + '. ' + j.en]; }) : [['', '（還沒有評審）']];
+  }
+  var RATIOS = [['3:2', '橫式 3:2（跟隊伍照片同比例）'], ['16:9', '寬螢幕 16:9'], ['1:1', '正方形 1:1'], ['4:5', '直式 4:5'], ['2:3', '直式 2:3']];
+  function ratioNum(r) { var p = String(r || '3:2').split(':'); return (Number(p[1]) || 2) / (Number(p[0]) || 3); }
+  function judgeBasic(pane, c, cp, lp) {
+    add(pane, [h('h3', { text: '評審' }),
+      fld('上台評審', sel(judgeOptions(), c.judge || '', function (v) { setPath(cp.concat('judge'), v); renderCueList(); renderInspector(); })),
+      h('div', { class: 'hint', text: '評審名字、照片請到上方「評審」頁編輯，或在「照片」分頁調整。' }),
+      h('h3', { text: '出場方式' }),
+      fld('懸念文字', chk('先顯示「NEXT JUDGE IS...」再讓評審登場', lp.concat('intro'))),
+      fld('照片比例', sel(RATIOS, getAt(S, lp.concat('ratio')) || '3:2', function (v) {
+        // 換比例時維持照片高度差不多，不會突然變很大
+        var L = getAt(S, lp), hgt = L.v.pw * ratioNum(L.ratio);
+        setPath(lp.concat('ratio'), v);
+        setPath(lp.concat(['v', 'pw']), Math.round(clamp(hgt / ratioNum(v), 200, 1920)));
+        renderInspector();
+      }), '直式照片外框會跟著拉長；外框 PNG 是橫式時建議用 3:2'),
+      h('div', { class: 'hint', text: '所有評審 Cue 共用底圖、版面與動畫。' })]);
+    bgEditor(pane, lp.concat('bg'));
+  }
+  function judgeText(pane, c, cp, lp) {
+    var t = lp.concat('text');
+    add(pane, [h('h3', { text: '懸念文字' }),
+      fld('英文', txtPath(t.concat('lead'), 'NEXT JUDGE IS...')), fld('中文', txtPath(t.concat('leadZh'), '下一位評審')),
+      h('div', { class: 'hint', text: '兩行都留空就不顯示懸念文字，按 GO 直接登場。' }),
+      h('h3', { text: '照片上方稱號' }),
+      fld('稱號', txtPath(t.concat('title'), 'JUDGE')),
+      h('div', { class: 'hint', text: '留空就不顯示。名字下方第二行顯示評審的中文名；沒有中文名時顯示標籤（Crew／城市）。' })]);
+  }
+  function judgePhoto(pane, c) {
+    var js = S.judges || [], j = FDM.judgeById(S, c.judge);
+    if (!j) { add(pane, h('div', { class: 'card muted', text: '請先在「基本」分頁選擇評審。' })); return; }
+    photoEditor(pane, j, function () { renderInspector(); }, ['judges', js.indexOf(j), 'photo']);
+  }
+  function judgeLayout(pane, c, cp, lp) {
+    var v = lp.concat('v');
+    add(pane, [h('h3', { text: '懸念文字' }),
+      sl(v.concat('lEs'), '英文字級', 12, 300), sl(v.concat('lZs'), '中文字級', 12, 200), sl(v.concat('lY'), '垂直位置', -200, 1000), sl(v.concat('lG'), '中英間距', -200, 400),
+      h('h3', { text: '照片框' }),
+      sl(v.concat('pw'), '照片框寬度', 200, 1920), sl(v.concat('px'), '水平位置', -900, 900), sl(v.concat('pt'), '垂直位置', -400, 1080), sl(v.concat('pad'), '框內邊距', 0, 300),
+      h('h3', { text: '稱號' }),
+      sl(v.concat('tS'), '稱號字級', 12, 240), sl(v.concat('tG'), '稱號距照片', -300, 400),
+      h('h3', { text: '名字' }),
+      sl(v.concat('ng'), '名字距照片', -300, 500), sl(v.concat('es'), '英文字級', 12, 300), sl(v.concat('zs'), '第二行字級', 12, 240), sl(v.concat('lg'), '行距', -100, 300)]);
+  }
+  function judgeAnim(pane, c, cp, lp) {
+    animEditor(pane, lp.concat('anim'), 'judge', [['lt', '懸念英文'], ['lz', '懸念中文'], null,
+      ['fr', '外框'], ['ph', '照片'], ['en', '英文名字'], ['zh', '第二行'], ['tt', '稱號']]);
+    add(pane, [h('h3', { text: '懸念' }),
+      sl(lp.concat('pause'), '懸念停頓 ms', 0, 10000, { step: 100 }),
+      fld('懸念退場', selPath(lp.concat('leadOut'), FDM.FX_OUT))]);
   }
 
   // ---------- 四強 ----------
@@ -1217,6 +1291,56 @@
       right));
   }
   function moveTeam(i, d) { var j = i + d; if (j < 0 || j >= S.teams.length) return; var a = clone(S.teams); var t = a[i]; a[i] = a[j]; a[j] = t; setPath(['teams'], a); renderPage(false); }
+
+  // ---------------------------------------------------------------------------
+  // 評審頁
+  // ---------------------------------------------------------------------------
+  function newJudge() { return { id: uid('j'), en: 'NEW JUDGE', zh: '', tag: '', photo: { src: null, trim: null, fit: 'auto', zoom: 100, x: 0, y: 0 } }; }
+  function pageJudges(page) {
+    var wrap = h('div', { class: 'pagewrap' });
+    page.appendChild(wrap);
+    var js = S.judges || [];
+    if (!FDM.judgeById(S, ui.judge) && js[0]) ui.judge = js[0].id;
+    var j = FDM.judgeById(S, ui.judge);
+    var mon = monitor('/output/?preview=' + encodeURIComponent('__judge:' + (j ? j.id : '')), '評審表演預覽', 'prev');
+    var right = h('div', { class: 'sticky' }, mon.el, h('div', { class: 'card' }, j ? h('div', { id: 'photoEd' }) : h('div', { class: 'muted', text: '新增評審後可在這裡上傳照片。' })));
+    if (j) photoEditor(right.querySelector('#photoEd'), j, function () { renderPage(true); }, ['judges', js.indexOf(j), 'photo']);
+    function move(i, d) { var k = i + d; if (k < 0 || k >= js.length) return; var a = clone(js); var t = a[i]; a[i] = a[k]; a[k] = t; setPath(['judges'], a); renderPage(false); }
+    var table = h('table', { class: 'grid' },
+      h('thead', null, h('tr', null, ['#', '照片', '英文名字', '中文名字', '標籤（Crew／城市）', ''].map(function (x) { return h('th', { text: x }); }))),
+      h('tbody', null, js.map(function (jd, i) {
+        return h('tr', { class: jd.id === ui.judge ? 'sel' : '', onclick: function (e) {
+          if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+          ui.judge = jd.id; saveUi(); renderPage(false);
+        } },
+        h('td', { class: 'faint', text: i + 1 }),
+        h('td', null, jd.photo.src ? h('img', { class: 'thumb', src: '/' + (jd.photo.trim || jd.photo.src), alt: '' }) : h('span', { class: 'faint', text: '未上傳' })),
+        h('td', null, txtPath(['judges', i, 'en'], 'JUDGE NAME')),
+        h('td', null, txtPath(['judges', i, 'zh'], '選填')),
+        h('td', null, txtPath(['judges', i, 'tag'], '選填')),
+        h('td', { style: 'white-space:nowrap' },
+          h('button', { class: 'ghost', text: '↑', title: '上移', onclick: function () { move(i, -1); } }),
+          h('button', { class: 'ghost', text: '↓', title: '下移', onclick: function () { move(i, 1); } }),
+          h('button', { class: 'ghost', text: '✕', title: '刪除', onclick: function () {
+            if (!confirm('刪除評審「' + jd.en + '」？使用這位評審的 Cue 會變成未選評審。')) return;
+            var a = clone(js); a.splice(i, 1); setPath(['judges'], a); renderPage(false);
+          } })));
+      })));
+    add(wrap, h('div', { class: 'split' },
+      h('div', null,
+        h('h2', { text: '評審資料', style: 'margin:0 0 4px' }),
+        h('div', { class: 'hint', text: '點一列可在右側調整照片。順序只影響「產生評審」；實際出場順序以 Cue 表為準。' }),
+        table,
+        h('div', { class: 'btnrow', style: 'margin-top:12px' },
+          h('button', { text: '＋ 新增評審', onclick: function () {
+            var n = newJudge(), a = clone(js); a.push(n); setPath(['judges'], a); ui.judge = n.id; renderPage(false);
+          } })),
+        h('h3', { text: '怎麼排進流程' }),
+        h('div', { class: 'hint', html: '到「流程 → 編排」，左下角類型選「評審表演」再選評審按新增，或按「產生評審」一次加入全部評審。<br>懸念文字、照片比例、版面與動畫在點選評審 Cue 後的右側設定。' }),
+        h('h3', { text: '照片建議' }),
+        h('div', { class: 'hint', text: '單人照片可以用去背 PNG（會自動裁掉透明邊）。想用直式照片時，在評審 Cue 的「基本」分頁把照片比例改成 4:5 或 2:3。' })),
+      right));
+  }
 
   // ---------------------------------------------------------------------------
   // 贊助商頁

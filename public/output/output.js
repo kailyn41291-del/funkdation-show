@@ -167,6 +167,7 @@
   function findCue(id) {
     if (!S || !id) return null;
     if (id.indexOf('__team:') === 0) return { id: id, type: 'team', team: id.slice(7) };
+    if (id.indexOf('__judge:') === 0) return { id: id, type: 'judge', judge: id.slice(8) };
     if (id === '__idle') return { id: id, type: 'idle' };
     for (var i = 0; i < S.cues.length; i++) if (S.cues[i].id === id) return S.cues[i];
     return null;
@@ -388,6 +389,93 @@
     sc.exit = exitAnim;
     sc.event = function (ev) {
       if (ev.name === 'entrance') sc.enter();
+      else if (ev.name === 'teamExit') exitAnim(function () {});
+    };
+    sc.update(ctx);
+    return sc;
+  };
+
+  // ---------- 評審表演 ----------
+  // 流程：懸念文字（NEXT JUDGE IS...）→ 淡出 → 外框、照片、名字、第二行、稱號依序出場；X 退場
+  function ratioOf(L) {
+    var r = String(L.ratio || '3:2').split(':');
+    return (Number(r[1]) || 2) / (Number(r[0]) || 3);
+  }
+  SCENES.judge = function (ctx) {
+    var sc = baseScene(ctx);
+    function T(cls, ls) { var x = Txt(sc.root, cls); x.t.classList.add(ls); return x; }
+    var leadA = T('en', 'ls-lead'), leadB = T('zh', 'ls-zh');
+    var tt = T('en', 'ls-title');
+    var box = PhotoBox(sc.root);
+    var en = T('en', 'ls-name'), zh = T('zh', 'ls-zh');
+    var EL = { fr: box.fr, ph: box.ph, en: en.t, zh: zh.t, tt: tt.t };
+    var ORDER = ['fr', 'ph', 'en', 'zh', 'tt'];
+    var LEAD = [leadA.t, leadB.t];
+    var visible = true;
+    function judge() {
+      var j = FDM.judgeById(S, sc.ctx.cue.judge);
+      if (!j && sc.ctx.preview) j = { en: '（未選評審）', photo: null, _ph: true };
+      return j;
+    }
+    sc.update = function (c) {
+      sc.ctx = c;
+      var L = c.layout, v = L.v, tx = L.text || {}, j = judge();
+      leadA.text(tx.lead || '');
+      leadB.text(tx.leadZh || '');
+      var ls = leadA.at(W / 2, v.lY, v.lEs, W - 160);
+      leadB.at(W / 2, v.lY + ls + v.lG, v.lZs, W - 160);
+      var w = v.pw, h = Math.round(w * ratioOf(L)), x = (W - w) / 2 + v.px, y = v.pt, cx = W / 2 + v.px;
+      box.set(j, x, y, w, h, v.pad, c.preview && (!j || j._ph));
+      tt.text(tx.title || '');
+      tt.at(cx, y - v.tG - v.tS, v.tS, W - 160);
+      en.text(j ? j.en : '');
+      zh.text(j ? (j.zh || j.tag || '') : '');
+      var es = en.at(cx, y + h + v.ng, v.es, W - 160);
+      zh.at(cx, y + h + v.ng + es + v.lg, v.zs, W - 160);
+      if (!c.preview && S.show.teamOut && visible) { hideAll(); visible = false; }
+    };
+    function hideAll() { ORDER.forEach(function (k) { FX.hide(EL[k]); }); LEAD.forEach(FX.hide); }
+    sc.showStatic = function () {
+      var out = !sc.ctx.preview && S.show.teamOut;
+      LEAD.forEach(FX.hide);
+      ORDER.forEach(function (k) { if (out) FX.hide(EL[k]); else FX.show(EL[k]); });
+      visible = !out;
+    };
+    function reveal(withLead) {
+      var tl = sc.restart(), L = sc.ctx.layout, tx = L.text || {};
+      hideAll();
+      visible = true;
+      var base = 0;
+      if (withLead && L.intro !== false && (tx.lead || tx.leadZh)) {
+        var A = FDM.chain(['lt', 'lz'], L.anim, 0, effectsOn);
+        tl.at(A.lt.start, function () { FX.run(leadA.t, A.lt.fx, A.lt.dur, tl); });
+        tl.at(A.lz.start, function () { FX.run(leadB.t, A.lz.fx, A.lz.dur, tl); });
+        var d = effectsOn ? L.anim.duration : 0;
+        var outS = A._end + (effectsOn ? L.pause : 0);
+        tl.at(outS, function () { LEAD.forEach(function (el) { FX.out(el, L.leadOut, d, tl); }); });
+        base = L.leadOut === 'none' ? outS : outS + d * (L.anim.overlap / 100);
+      }
+      var a = FDM.chain(ORDER, L.anim, base, effectsOn);
+      ORDER.forEach(function (k) { tl.at(a[k].start, function () { FX.run(EL[k], a[k].fx, a[k].dur, tl); }); });
+    }
+    function exitAnim(done) {
+      var tl = sc.restart();
+      if (!visible) { done(); return; }
+      visible = false;
+      var anim = sc.ctx.layout.anim;
+      LEAD.forEach(function (el) { FX.out(el, 'fade', effectsOn ? 300 : 0, tl); });
+      var rev = ORDER.slice().reverse();
+      var a = FDM.chain(rev, anim, 0, effectsOn);
+      rev.forEach(function (k) {
+        tl.at(a[k].start, function () { FX.out(EL[k], FX.reverseOf(anim.steps[k].fx), a[k].dur, tl); });
+      });
+      tl.at(a._end + 30, done);
+    }
+    sc.enter = function () { reveal(true); };
+    sc.exit = exitAnim;
+    sc.event = function (ev) {
+      if (ev.name === 'entrance') reveal(true);
+      else if (ev.name === 'judgeDirect') reveal(false);
       else if (ev.name === 'teamExit') exitAnim(function () {});
     };
     sc.update(ctx);
@@ -924,7 +1012,7 @@
   var preloaded = {}, preloadSig = '';
   function preloadAssets() {
     var list = [S.frame];
-    S.teams.forEach(function (t) { if (t.photo) list.push(t.photo.trim || t.photo.src); });
+    S.teams.concat(S.judges || []).forEach(function (t) { if (t.photo) list.push(t.photo.trim || t.photo.src); });
     S.sponsors.logos.forEach(function (l) { list.push(l.src); });
     for (var k in S.layouts) {
       var L = S.layouts[k];
@@ -1004,6 +1092,8 @@
       v(W / 2 - q.sd, true); v(W / 2 + q.sd, true); h(q.sy, true);
     } else if (cue && cue.type === 'team' && L) {
       var t = L.v; h(t.pt + Math.round(t.pw * 2 / 3) / 2);
+    } else if (cue && cue.type === 'judge' && L) {
+      var jv = L.v; h(jv.pt + Math.round(jv.pw * ratioOf(L)) / 2);
     }
   }
 
@@ -1012,7 +1102,7 @@
   function prewarm() {
     if (!S) return;
     var ev = S.event, texts = [], sig;
-    S.teams.forEach(function (t) { texts.push(t.en, t.zh, t.tag); });
+    S.teams.concat(S.judges || []).forEach(function (t) { texts.push(t.en, t.zh, t.tag); });
     S.cues.forEach(function (c) { texts.push(c.title, c.zh); });
     for (var k in S.layouts) {
       var L = S.layouts[k];
