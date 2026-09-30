@@ -17,9 +17,13 @@
     judge: '評審表演',
     top4: '四強公布',
     battle: '對戰計分',
-    champ: '冠亞軍公布',
+    champ: '冠軍公布',
     black: '黑畫面'
   };
+
+  // 四強位置 → 晉級名次：對戰 1 = 第 1 名 vs 第 4 名，對戰 2 = 第 2 名 vs 第 3 名
+  var TOP4_RANK = [1, 4, 2, 3];
+  function top4Label(i) { return '晉級第 ' + TOP4_RANK[i] + ' 名'; }
 
   var BATTLES = { semi1: '四強對戰 1', semi2: '四強對戰 2', final: '決賽' };
 
@@ -51,8 +55,8 @@
 
   function sourceLabel(src) {
     if (!src) return '未設定';
-    if (src.source === 'team') return '指定隊伍';
-    if (src.source === 'top4') return '四強第 ' + (src.index + 1) + ' 隊';
+    if (src.source === 'team') return src.team ? '指定隊伍' : '未選隊伍';
+    if (src.source === 'top4') return top4Label(src.index);
     if (src.source === 'winner') return (BATTLES[src.battle] || src.battle) + ' 勝方';
     if (src.source === 'loser') return (BATTLES[src.battle] || src.battle) + ' 敗方';
     return '未設定';
@@ -94,8 +98,8 @@
       return (l ? l.en : sourceLabel(cue.left)) + ' vs ' + (r ? r.en : sourceLabel(cue.right));
     }
     if (cue.type === 'champ') {
-      var c = resolve(state, cue.champ);
-      return c ? '冠軍 ' + c.en : TYPES.champ;
+      var c = resolve(state, cue.champ), r = resolve(state, cue.runner);
+      return '排舞賽 ' + (r ? r.en : '未選') + '／Battle ' + (c ? c.en : '未決定');
     }
     return TYPES[cue.type] || '';
   }
@@ -169,7 +173,7 @@
 
   global.FDM = {
     zhNum: zhNum, TYPES: TYPES, BATTLES: BATTLES, FX_IN: FX_IN, FX_OUT: FX_OUT,
-    teamById: teamById, judgeById: judgeById, battleCue: battleCue, resolve: resolve, sourceLabel: sourceLabel,
+    teamById: teamById, judgeById: judgeById, TOP4_RANK: TOP4_RANK, top4Label: top4Label, battleCue: battleCue, resolve: resolve, sourceLabel: sourceLabel,
     cueTitle: cueTitle, cueSub: cueSub, layoutKey: layoutKey, layoutFor: layoutFor,
     chain: chain, PRESETS: PRESETS, presetAnim: presetAnim, line2: line2
   };

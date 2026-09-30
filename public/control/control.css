@@ -191,3 +191,15 @@ table.grid input[type=text] { width: 100%; }
 
 .obssteps { margin: 8px 0 4px; padding-left: 22px; line-height: 1.8; }
 .obssteps b { color: var(--go); }
+
+/* 四強對戰組合 */
+.match { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0; background: var(--panel2); }
+.match .mtitle { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--accent-2); margin-bottom: 8px; }
+.match .mrow { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 10px; align-items: end; }
+.match .mside select { width: 100%; }
+.match .rank { font-size: 12px; margin-bottom: 4px; color: var(--muted); }
+.match .rank b { font-size: 15px; color: var(--text); }
+.match .mvs { font-weight: 900; font-size: 16px; padding-bottom: 7px; color: var(--muted); }
+.awards .aw { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
+.awards .aw .lab { width: 90px; flex: none; color: var(--muted); font-size: 13px; }
+.awards .aw select { flex: 1; }

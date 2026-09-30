@@ -869,7 +869,7 @@
     return sc;
   };
 
-  // ---------- 冠亞軍公布 ----------
+  // ---------- 頒獎：c = Battle 冠軍、r = 排舞賽冠軍 ----------
   SCENES.champ = function (ctx) {
     var sc = baseScene(ctx);
     function T(cls, ls) { var x = Txt(sc.root, cls); x.t.classList.add(ls); return x; }
@@ -887,7 +887,7 @@
       var c = FDM.resolve(S, sc.ctx.cue.champ), r = FDM.resolve(S, sc.ctx.cue.runner);
       if (sc.ctx.preview) {
         if (!c) c = { en: '（決賽勝方）', photo: null, _ph: true };
-        if (!r) r = { en: '（決賽敗方）', photo: null, _ph: true };
+        if (!r) r = { en: '（排舞賽冠軍）', photo: null, _ph: true };
       }
       return { c: c, r: r };
     }
@@ -904,22 +904,22 @@
     function layout() {
       var c = sc.ctx, v = c.layout.v, tx = c.layout.text, tm = teams();
       var soloTeam = texts(soloK);
-      leadA.at(W / 2, v.lY, v.lEs);
-      leadB.at(W / 2, v.lY + v.lEs + v.lG, v.lZs);
+      var les = leadA.at(W / 2, v.lY, v.lEs, W - 160);
+      leadB.at(W / 2, v.lY + les + v.lG, v.lZs, W - 160);
       var w = v.sw, h = Math.round(w * 2 / 3), y = v.sy;
       sB.set(soloTeam, (W - w) / 2, y, w, h, v.pad, c.preview && (!soloTeam || soloTeam._ph));
-      sT.at(W / 2, y - v.sTg - v.sTs, v.sTs);
+      sT.at(W / 2, y - v.sTg - v.sTs, v.sTs, W - 160);
       var sns = sN.at(W / 2, y + h + v.sNg, v.sNs, W - 160);
       sZ.at(W / 2, y + h + v.sNg + sns + v.sZg, v.sZs);
       var cw = v.cw, ch = Math.round(cw * 2 / 3), rw = v.rw, rh = Math.round(rw * 2 / 3);
-      var tot = cw + v.gap + rw, cx = W / 2 - tot / 2, rx = cx + cw + v.gap, ty = v.dy, ry = ty + (ch - rh);
+      var tot = cw + v.gap + rw, rx = W / 2 - tot / 2, cx = rx + rw + v.gap, ty = v.dy, ry = ty + (ch - rh); // 排舞賽冠軍在左、Battle 冠軍在右
       cB.set(tm.c, cx, ty, cw, ch, v.pad, c.preview && (!tm.c || tm.c._ph));
       rB.set(tm.r, rx, ry, rw, rh, v.pad, c.preview && (!tm.r || tm.r._ph));
       cT.text(tx.tc); rT.text(tx.trr);
       cN.text(tm.c ? tm.c.en : ''); rN.text(tm.r ? tm.r.en : '');
-      cT.at(cx + cw / 2, ty - v.dTg - v.cTs, v.cTs);
+      cT.at(cx + cw / 2, ty - v.dTg - v.cTs, v.cTs, cw + Math.max(0, v.gap) - 20);
       cN.at(cx + cw / 2, ty + ch + v.dNg, v.cNs, cw + Math.max(0, v.gap) - 20);
-      rT.at(rx + rw / 2, ry - v.dTg - v.rTs, v.rTs);
+      rT.at(rx + rw / 2, ry - v.dTg - v.rTs, v.rTs, rw + Math.max(0, v.gap) - 20);
       rN.at(rx + rw / 2, ry + rh + v.dNg, v.rNs, rw + Math.max(0, v.gap) - 20);
     }
     sc.update = function (c) {

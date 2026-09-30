@@ -70,13 +70,13 @@ function defaultLayouts() {
     champ: {
       bg: bg(),
       text: {
-        lc: 'THE CHAMPION IS...', lcz: '冠軍是', tc: 'CHAMPION', cz: '冠軍',
-        lr: 'THE RUNNER-UP IS...', lrz: '亞軍是', trr: 'RUNNER-UP', rz: '亞軍'
+        lc: 'THE BATTLE CHAMPION IS...', lcz: 'BATTLE 冠軍是', tc: 'BATTLE CHAMPION', cz: 'BATTLE 冠軍',
+        lr: 'THE SHOWCASE CHAMPION IS...', lrz: '排舞賽冠軍是', trr: 'SHOWCASE CHAMPION', rz: '排舞賽冠軍'
       },
       v: {
         lEs: 96, lZs: 40, lY: 440, lG: 28,
         sw: 660, sy: 250, sTs: 44, sTg: 34, sNs: 64, sNg: 34, sZs: 30, sZg: 18,
-        cw: 560, rw: 440, gap: 140, dy: 280, cTs: 40, cNs: 50, rTs: 30, rNs: 38, dTg: 26, dNg: 30,
+        cw: 520, rw: 520, gap: 140, dy: 280, cTs: 36, cNs: 46, rTs: 36, rNs: 46, dTg: 26, dNg: 30,
         pad: 40
       },
       anim: {
@@ -117,8 +117,9 @@ function defaultCues() {
       title: 'FINAL', zh: '決賽', rounds: 5, seconds: 60, own: false
     },
     {
-      id: 'c-champ', type: 'champ', name: '冠亞軍公布',
-      champ: { source: 'winner', battle: 'final' }, runner: { source: 'loser', battle: 'final' }
+      id: 'c-champ', type: 'champ', name: '冠軍公布',
+      // champ = Battle 冠軍（決賽勝方），runner = 排舞賽冠軍（演出中選擇）
+      champ: { source: 'winner', battle: 'final' }, runner: { source: 'team', team: null }
     }
   );
   return cues;
@@ -126,7 +127,7 @@ function defaultCues() {
 
 function defaultState() {
   return {
-    schema: 2,
+    schema: 3,
     event: {
       title: 'FUNKDATION VOL.4',
       fonts: [],

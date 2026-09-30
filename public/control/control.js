@@ -473,7 +473,7 @@
     if (type === 'team') c.team = team;
     if (type === 'judge') c.judge = team;
     if (type === 'battle') Object.assign(c, { battle: 'semi1', name: '四強對戰 1', left: { source: 'top4', index: 0 }, right: { source: 'top4', index: 1 }, title: 'SEMI FINAL', zh: '四強賽', rounds: 4, seconds: 60, own: false });
-    if (type === 'champ') Object.assign(c, { name: '冠亞軍公布', champ: { source: 'winner', battle: 'final' }, runner: { source: 'loser', battle: 'final' } });
+    if (type === 'champ') Object.assign(c, { name: '冠軍公布', champ: { source: 'winner', battle: 'final' }, runner: { source: 'team', team: null } });
     if (['idle', 'overview', 'top4', 'black'].indexOf(type) >= 0) c.name = FDM.TYPES[type];
     return c;
   }
@@ -596,7 +596,7 @@
   function timerReset() { var t = S.show.timer; cmd([set(['show', 'timer'], { duration: t.duration, endsAt: null, pausedLeft: t.duration })]); }
   function timerSet(sec) { cmd([set(['show', 'timer'], { duration: sec, endsAt: null, pausedLeft: sec })]); }
 
-  // ---------- 冠亞軍 ----------
+  // ---------- 頒獎（排舞賽冠軍／Battle 冠軍） ----------
   function champReveal(k) { cmd([set(['show', 'champView'], 'solo-' + k)], { name: 'champReveal', k: k }); }
   function champDuo() { cmd([set(['show', 'champView'], 'duo')], { name: 'champDuo' }); }
   function champView(v) { cmd([set(['show', 'champView'], v)]); }
@@ -606,7 +606,7 @@
     return '<b>快捷鍵</b>　<span class="kbd">空白</span> GO　<span class="kbd">B</span> 黑畫面<br>' +
       '單隊／評審：<span class="kbd">X</span> 退場<br>' +
       '對戰：<span class="kbd">T</span> 計時開始／暫停　<span class="kbd">R</span> 重置　<span class="kbd">←</span><span class="kbd">→</span> 印章　<span class="kbd">↓</span> 印章淡出<br>' +
-      '冠亞軍：<span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span> 揭曉　<span class="kbd">Q</span><span class="kbd">W</span><span class="kbd">E</span> 直接切換　<span class="kbd">Esc</span> 回底圖';
+      '頒獎：<span class="kbd">1</span> 排舞賽冠軍　<span class="kbd">2</span> Battle 冠軍　<span class="kbd">3</span> 同框　<span class="kbd">Q</span><span class="kbd">W</span><span class="kbd">E</span> 直接切換　<span class="kbd">Esc</span> 回底圖';
   }
   document.addEventListener('keydown', function (e) {
     if (!S || ui.page !== 'flow' || ui.mode !== 'show') return;
@@ -691,22 +691,27 @@
 
   function top4Panel(pane) {
     var err = h('div', { class: 'err' });
-    var picks = h('div');
-    for (var i = 0; i < 4; i++) {
-      (function (i) {
-        var s = sel(teamOptions(true), S.results.top4[i] || '', function (v, el) {
-          if (v && S.results.top4.indexOf(v) >= 0 && S.results.top4.indexOf(v) !== i) { err.textContent = '這隊已經選過了'; el.value = S.results.top4[i] || ''; return; }
-          err.textContent = '';
-          var a = clone(S.results.top4); a[i] = v || null; setPath(['results', 'top4'], a);
-          renderCueList();
-        });
-        picks.appendChild(fld('第 ' + (i + 1) + ' 隊', s, i % 2 === 0 ? '對 ' + (i + 2) : ''));
-      })(i);
+    // 四強位置 0/1 = 對戰 1（第 1 名 vs 第 4 名），2/3 = 對戰 2（第 2 名 vs 第 3 名）
+    function pick(i) {
+      var rank = FDM.TOP4_RANK[i];
+      var s = sel(teamOptions(true), S.results.top4[i] || '', function (v, el) {
+        if (v && S.results.top4.indexOf(v) >= 0 && S.results.top4.indexOf(v) !== i) { err.textContent = '這隊已經選過了'; el.value = S.results.top4[i] || ''; return; }
+        err.textContent = '';
+        var a = clone(S.results.top4); a[i] = v || null; setPath(['results', 'top4'], a);
+        renderCueList();
+      });
+      return h('div', { class: 'mside' }, h('div', { class: 'rank' }, h('b', { text: '第 ' + rank + ' 名' }), ' 晉級'), s);
     }
+    function match(n, a, b) {
+      return h('div', { class: 'match' },
+        h('div', { class: 'mtitle', text: '四強對戰 ' + n + '　第 ' + FDM.TOP4_RANK[a] + ' 名 vs 第 ' + FDM.TOP4_RANK[b] + ' 名' }),
+        h('div', { class: 'mrow' }, pick(a), h('div', { class: 'mvs', text: 'VS' }), pick(b)));
+    }
+    var picks = h('div', null, match(1, 0, 1), match(2, 2, 3));
     var cnt = h('span', { class: 'muted' });
     onLive(function () { cnt.textContent = '已揭曉 ' + (S.show.top4Shown || 0) + ' / 4'; });
-    add(pane, [h('h3', { text: '晉級隊伍（依揭曉順序）' }), picks, err,
-      h('div', { class: 'hint', text: '第 1、2 隊為四強對戰 1，第 3、4 隊為四強對戰 2，後面的對戰 Cue 會自動帶入。' }),
+    add(pane, [h('h3', { text: '晉級隊伍（依對戰組合填入）' }), picks, err,
+      h('div', { class: 'hint', text: '依晉級名次填入：第 1 名打第 4 名、第 2 名打第 3 名，後面的對戰 Cue 會自動帶入。揭曉順序：對戰 1 的兩隊 → 對戰 2 的兩隊。' }),
       h('h3', { text: '揭曉' }), h('div', { class: 'btnrow' },
         h('button', { class: 'primary', text: '揭曉下一隊', onclick: function () {
           if (S.results.top4.some(function (x) { return !x; })) { toast('請先選好 4 隊', true); return; }
@@ -797,24 +802,30 @@
   }
 
   function champPanel(pane, c) {
-    var champ = FDM.resolve(S, c.champ), runner = FDM.resolve(S, c.runner);
+    var champ = FDM.resolve(S, c.champ), show = FDM.resolve(S, c.runner);
+    var cp = ['cues', cueIndex(c.id)];
     var viewTx = h('span', { class: 'muted' });
-    var NAMES = { none: '底圖', 'lead-c': '冠軍懸念文字', 'lead-r': '亞軍懸念文字', 'solo-c': '單獨冠軍', 'solo-r': '單獨亞軍', duo: '冠亞軍同框' };
+    var NAMES = { none: '底圖', 'lead-c': 'Battle 冠軍懸念文字', 'lead-r': '排舞賽冠軍懸念文字', 'solo-c': '單獨 Battle 冠軍', 'solo-r': '單獨排舞賽冠軍', duo: '兩位冠軍同框' };
     onLive(function () { viewTx.textContent = '目前：' + (NAMES[S.show.champView] || S.show.champView); });
+    // 排舞賽冠軍由評審決定，演出時直接在這裡選
+    var showPick = c.runner && c.runner.source === 'team'
+      ? sel(teamOptions(true), c.runner.team || '', function (v) { setPath(cp.concat('runner'), { source: 'team', team: v || null }); renderCueList(); renderInspector(); })
+      : h('b', { text: show ? show.en : FDM.sourceLabel(c.runner) + '（未決定）' });
     add(pane, [
-      h('div', { class: 'card' },
-        h('div', null, '冠軍：', h('b', { text: champ ? champ.en : '（未決定）' })),
-        h('div', null, '亞軍：', h('b', { text: runner ? runner.en : '（未決定）' })),
-        (!champ || !runner) ? h('div', { class: 'err', text: '請先在決賽按「確認晉級」，或在編排模式指定隊伍。' }) : null),
+      h('div', { class: 'card awards' },
+        h('div', { class: 'aw' }, h('span', { class: 'lab', text: '排舞賽冠軍' }), showPick),
+        h('div', { class: 'aw' }, h('span', { class: 'lab', text: 'Battle 冠軍' }), h('b', { text: champ ? champ.en : '（決賽確認晉級後自動帶入）' })),
+        !show ? h('div', { class: 'err', text: '請先選擇排舞賽冠軍。' }) : null,
+        !champ ? h('div', { class: 'err', text: '請先在決賽按「確認晉級」，Battle 冠軍才會帶入。' }) : null),
       h('h3', { text: '揭曉（含懸念文字）' }),
       h('div', { class: 'btnrow' },
-        h('button', { class: 'primary', text: '1. 亞軍揭曉', onclick: function () { champReveal('r'); } }),
-        h('button', { class: 'primary', text: '2. 冠軍揭曉', onclick: function () { champReveal('c'); } }),
-        h('button', { class: 'primary', text: '3. 冠亞軍同框', onclick: champDuo })),
+        h('button', { class: 'primary', text: '1. 排舞賽冠軍揭曉', onclick: function () { champReveal('r'); } }),
+        h('button', { class: 'primary', text: '2. Battle 冠軍揭曉', onclick: function () { champReveal('c'); } }),
+        h('button', { class: 'primary', text: '3. 兩位冠軍同框', onclick: champDuo })),
       h('h3', { text: '直接切換（拍得獎照用）' }),
       h('div', { class: 'btnrow' },
-        h('button', { text: '單獨亞軍（Q）', onclick: function () { champView('solo-r'); } }),
-        h('button', { text: '單獨冠軍（W）', onclick: function () { champView('solo-c'); } }),
+        h('button', { text: '單獨排舞賽冠軍（Q）', onclick: function () { champView('solo-r'); } }),
+        h('button', { text: '單獨 Battle 冠軍（W）', onclick: function () { champView('solo-c'); } }),
         h('button', { text: '同框（E）', onclick: function () { champView('duo'); } }),
         h('button', { text: '回到底圖（Esc）', onclick: function () { champView('none'); } })),
       viewTx
@@ -837,8 +848,8 @@
       if (c.type === 'judge') btns = [['登場（含懸念）', { name: 'entrance' }], ['直接登場', { name: 'judgeDirect' }], ['退場', { name: 'teamExit' }]];
       if (c.type === 'top4') btns = [['自動揭曉', { name: 'top4auto' }], ['重置', { name: 'top4reset' }]];
       if (c.type === 'battle') btns = [['登場', { name: 'entrance' }], ['左方印章', { name: 'seal', side: 'l' }], ['右方印章', { name: 'seal', side: 'r' }], ['印章淡出', { name: 'sealFade' }], ['最後 10 秒', { name: 'testTimer' }], ['比分變化', { name: 'testScore' }]];
-      if (c.type === 'champ') btns = [['亞軍揭曉', { name: 'champReveal', k: 'r' }], ['冠軍揭曉', { name: 'champReveal', k: 'c' }], ['同框揭曉', { name: 'champDuo' }], null,
-        ['懸念文字', { name: 'champView', view: 'lead-c' }], ['單獨亞軍', { name: 'champView', view: 'solo-r' }], ['單獨冠軍', { name: 'champView', view: 'solo-c' }], ['同框', { name: 'champView', view: 'duo' }]];
+      if (c.type === 'champ') btns = [['排舞賽冠軍揭曉', { name: 'champReveal', k: 'r' }], ['Battle 冠軍揭曉', { name: 'champReveal', k: 'c' }], ['同框揭曉', { name: 'champDuo' }], null,
+        ['懸念文字', { name: 'champView', view: 'lead-c' }], ['單獨排舞賽', { name: 'champView', view: 'solo-r' }], ['單獨 Battle', { name: 'champView', view: 'solo-c' }], ['同框', { name: 'champView', view: 'duo' }]];
       if (c.type === 'idle') btns = [['登場', { name: 'entrance' }]];
     }
     if (btns.length) add(tb, h('span', { class: 'faint', text: '預覽測試：' }));
@@ -931,17 +942,19 @@
     add(pane, [h('h3', { text: '底圖' }), box, h('div', { class: 'hint', text: '同類型的 Cue 共用底圖與版面（對戰可勾選獨立版型）。' })]);
   }
 
-  function sourceSelect(value, onchange) {
+  function sourceSelect(value, onchange, withEmpty) {
     var opts = [
+      withEmpty ? { group: '尚未決定', items: [['', '（未選，演出時再選）']] } : null,
       { group: '指定隊伍', items: S.teams.map(function (t, i) { return ['team:' + t.id, (i + 1) + '. ' + t.en + (t.seed ? '（種子）' : '')]; }) },
-      { group: '自動帶入', items: [['top4:0', '四強第 1 隊'], ['top4:1', '四強第 2 隊'], ['top4:2', '四強第 3 隊'], ['top4:3', '四強第 4 隊'],
+      { group: '自動帶入', items: [['top4:0', '晉級第 1 名'], ['top4:2', '晉級第 2 名'], ['top4:3', '晉級第 3 名'], ['top4:1', '晉級第 4 名'],
         ['winner:semi1', '四強對戰 1 勝方'], ['winner:semi2', '四強對戰 2 勝方'], ['winner:final', '決賽勝方'],
         ['loser:semi1', '四強對戰 1 敗方'], ['loser:semi2', '四強對戰 2 敗方'], ['loser:final', '決賽敗方']] }
-    ];
-    var enc = value ? (value.source === 'team' ? 'team:' + value.team : value.source === 'top4' ? 'top4:' + value.index : value.source + ':' + value.battle) : '';
+    ].filter(Boolean);
+    var enc = value ? (value.source === 'team' ? (value.team ? 'team:' + value.team : '') : value.source === 'top4' ? 'top4:' + value.index : value.source + ':' + value.battle) : '';
     return sel(opts, enc, function (v) {
       var p = v.split(':'), o;
-      if (p[0] === 'team') o = { source: 'team', team: p[1] };
+      if (!v) o = { source: 'team', team: null };
+      else if (p[0] === 'team') o = { source: 'team', team: p[1] };
       else if (p[0] === 'top4') o = { source: 'top4', index: +p[1] };
       else o = { source: p[0], battle: p[1] };
       onchange(o);
@@ -973,7 +986,7 @@
     var t = FDM.teamById(S, id);
     if (!t) { add(pane, h('div', { class: 'card muted', text: '這個位置是自動帶入，隊伍決定後才能調整照片。也可以到「隊伍」頁先調整每隊的照片。' })); return; }
     photoEditor(pane, t, function () { renderInspector(); });
-    add(pane, h('div', { class: 'hint', text: '照片設定存在隊伍資料上，單隊展示、四強、對戰、冠亞軍都會沿用。' }));
+    add(pane, h('div', { class: 'hint', text: '照片設定存在隊伍資料上，單隊展示、四強、對戰、頒獎都會沿用。' }));
   }
   function photoEditor(pane, t, redraw, pp) {
     pp = pp || ['teams', S.teams.indexOf(t), 'photo'];
@@ -1060,7 +1073,7 @@
   function top4Basic(pane, c, cp, lp) {
     add(pane, [nameField(cp), h('h3', { text: '排列方式' }),
       fld('模式', selPath(lp.concat('mode'), [['step', '逐組揭曉（兩隊出現後拉開、VS 落下）'], ['pair', '對戰組合（直接兩兩一組）'], ['row', '一排四隊']])),
-      h('div', { class: 'hint', text: '晉級隊伍在演出模式選擇：第 1、2 隊一組，第 3、4 隊一組。' })]);
+      h('div', { class: 'hint', text: '晉級隊伍在演出模式選擇：四強對戰 1 = 第 1 名 vs 第 4 名，四強對戰 2 = 第 2 名 vs 第 3 名。' })]);
     bgEditor(pane, lp.concat('bg'));
   }
   function top4Layout(pane, c, cp, lp) {
@@ -1163,19 +1176,19 @@
       fld('震動', chk('最後 3 秒加強並震動', lp.concat(['timer', 'shake'])))]);
   }
 
-  // ---------- 冠亞軍 ----------
+  // ---------- 頒獎（排舞賽冠軍／Battle 冠軍） ----------
   function champBasic(pane, c, cp, lp) {
-    add(pane, [nameField(cp), h('h3', { text: '隊伍' }),
-      fld('冠軍', sourceSelect(c.champ, function (o) { setPath(cp.concat('champ'), o); renderCueList(); })),
-      fld('亞軍', sourceSelect(c.runner, function (o) { setPath(cp.concat('runner'), o); })),
-      h('div', { class: 'hint', text: '預設自動帶入決賽的勝方與敗方（在決賽按「確認晉級」後決定）。' })]);
+    add(pane, [nameField(cp), h('h3', { text: '得獎隊伍' }),
+      fld('排舞賽冠軍', sourceSelect(c.runner, function (o) { setPath(cp.concat('runner'), o); renderCueList(); }, true), '可以先留空，演出時在頒獎 Cue 直接選'),
+      fld('Battle 冠軍', sourceSelect(c.champ, function (o) { setPath(cp.concat('champ'), o); renderCueList(); }), '預設自動帶入決賽勝方'),
+      h('div', { class: 'hint', text: '沒有亞軍。排舞賽冠軍與 Battle 冠軍可以是同一隊。' })]);
     bgEditor(pane, lp.concat('bg'));
   }
   function champText(pane, c, cp, lp) {
     var t = lp.concat('text');
-    add(pane, [h('h3', { text: '冠軍' }),
+    add(pane, [h('h3', { text: 'Battle 冠軍' }),
       fld('懸念英文', txtPath(t.concat('lc'))), fld('懸念中文', txtPath(t.concat('lcz'))), fld('稱號', txtPath(t.concat('tc'))), fld('中文', txtPath(t.concat('cz'))),
-      h('h3', { text: '亞軍' }),
+      h('h3', { text: '排舞賽冠軍' }),
       fld('懸念英文', txtPath(t.concat('lr'))), fld('懸念中文', txtPath(t.concat('lrz'))), fld('稱號', txtPath(t.concat('trr'))), fld('中文', txtPath(t.concat('rz')))]);
   }
   function champLayout(pane, c, cp, lp) {
@@ -1186,8 +1199,8 @@
       sl(v.concat('sw'), '照片寬度', 300, 1400), sl(v.concat('sy'), '照片垂直', -200, 900), sl(v.concat('sTs'), '稱號字級', 12, 240), sl(v.concat('sTg'), '稱號距照片', -300, 400),
       sl(v.concat('sNs'), '隊名字級', 12, 240), sl(v.concat('sNg'), '隊名距照片', -300, 400), sl(v.concat('sZs'), '中文字級', 12, 200), sl(v.concat('sZg'), '中文行距', -100, 300),
       h('h3', { text: '同框畫面' }),
-      sl(v.concat('cw'), '冠軍照片寬度', 200, 1100), sl(v.concat('rw'), '亞軍照片寬度', 200, 1100), sl(v.concat('gap'), '兩隊間距', -200, 800), sl(v.concat('dy'), '垂直位置', -200, 900),
-      sl(v.concat('cTs'), '冠軍稱號字級', 12, 200), sl(v.concat('cNs'), '冠軍隊名字級', 12, 200), sl(v.concat('rTs'), '亞軍稱號字級', 12, 200), sl(v.concat('rNs'), '亞軍隊名字級', 12, 200),
+      sl(v.concat('cw'), 'Battle 冠軍照片寬度（右）', 200, 1100), sl(v.concat('rw'), '排舞賽冠軍照片寬度（左）', 200, 1100), sl(v.concat('gap'), '兩隊間距', -200, 800), sl(v.concat('dy'), '垂直位置', -200, 900),
+      sl(v.concat('cTs'), 'Battle 稱號字級', 12, 200), sl(v.concat('cNs'), 'Battle 隊名字級', 12, 200), sl(v.concat('rTs'), '排舞賽稱號字級', 12, 200), sl(v.concat('rNs'), '排舞賽隊名字級', 12, 200),
       sl(v.concat('dTg'), '稱號距照片', -300, 400), sl(v.concat('dNg'), '隊名距照片', -300, 400), sl(v.concat('pad'), '框內邊距', 0, 300)]);
   }
   function champAnim(pane, c, cp, lp) {
@@ -1198,7 +1211,7 @@
     add(pane, [h('h3', { text: '懸念與同框' }),
       sl(lp.concat('pause'), '懸念停頓 ms', 0, 10000, { step: 100 }),
       fld('懸念退場', selPath(lp.concat('leadOut'), FDM.FX_OUT)),
-      fld('同框順序', selPath(lp.concat('duoOrder'), [['rc', '亞軍先、冠軍後'], ['cr', '冠軍先、亞軍後'], ['same', '兩隊同時']])),
+      fld('同框順序', selPath(lp.concat('duoOrder'), [['rc', '排舞賽冠軍先、Battle 冠軍後'], ['cr', 'Battle 冠軍先、排舞賽冠軍後'], ['same', '兩隊同時']])),
       sl(lp.concat('stg'), '兩隊間隔 ms', 0, 5000, { step: 50 })]);
   }
 

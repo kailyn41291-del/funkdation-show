@@ -155,6 +155,8 @@ async function state() { return (await (await fetch(BASE + '/api/state')).json()
   await shot('22-top4-all');
   s = await state();
   check('四強揭曉 4 / 4', s.show.top4Shown === 4 && s.results.top4.join() === 't1,t7,t2,t4');
+  const matchTitles = await ctrl.locator('.match .mtitle').allTextContents();
+  check('四強選隊依對戰組合標示', matchTitles[0].includes('第 1 名 vs 第 4 名') && matchTitles[1].includes('第 2 名 vs 第 3 名'), matchTitles.join(' / '));
 
   // 四強對戰 1
   await key('Space'); await sleep(3500);
@@ -210,10 +212,13 @@ async function state() { return (await (await fetch(BASE + '/api/state')).json()
   await shot('40-final');
   await ctrl.locator('.sc').nth(1).getByRole('button', { name: '確認晉級' }).click(); await sleep(400);
 
-  // 冠亞軍
+  // 頒獎：排舞賽冠軍（演出時選）＋ Battle 冠軍（決賽勝方）
   await key('Space'); await sleep(800);
+  await ctrl.locator('.awards select').selectOption('t7'); await sleep(400);
+  s = await state();
+  check('頒獎時選排舞賽冠軍', s.cues.find(c => c.id === 'c-champ').runner.team === 't7');
   await key('1'); await sleep(5500);
-  await shot('50-runnerup');
+  await shot('50-showcase-champion');
   await key('2'); await sleep(2000);
   await shot('51-champion-lead');
   await sleep(3500);

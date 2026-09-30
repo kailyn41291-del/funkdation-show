@@ -17,6 +17,33 @@ function isPlainObject(v) {
 }
 
 // 只補上缺少的欄位，不覆蓋已存在的值（讓舊存檔升級到新版欄位）
+// 舊版（schema 2）頒獎是「冠軍／亞軍」，改成「Battle 冠軍／排舞賽冠軍」：沒改過的預設文字與尺寸換成新的
+const CHAMP_OLD = {
+  text: { lc: 'THE CHAMPION IS...', lcz: '冠軍是', tc: 'CHAMPION', cz: '冠軍', lr: 'THE RUNNER-UP IS...', lrz: '亞軍是', trr: 'RUNNER-UP', rz: '亞軍' },
+  v: { cw: 560, rw: 440, cTs: 40, cNs: 50, rTs: 30, rNs: 38 }
+};
+function migrate(state) {
+  if ((state.schema || 0) >= 3) return state;
+  const def = defaultState();
+  for (const [k, L] of Object.entries(state.layouts || {})) {
+    if (k !== 'champ' || !L) continue;
+    for (const part of ['text', 'v']) {
+      if (!L[part]) continue;
+      for (const [key, old] of Object.entries(CHAMP_OLD[part])) {
+        if (L[part][key] === old) L[part][key] = def.layouts.champ[part][key];
+      }
+    }
+  }
+  for (const c of state.cues || []) {
+    if (c.type !== 'champ') continue;
+    if (c.runner && c.runner.source === 'loser' && c.runner.battle === 'final') c.runner = { source: 'team', team: null };
+    if (c.name === '冠亞軍公布') c.name = '冠軍公布';
+  }
+  if (state.show && typeof state.show.champView === 'string' && state.show.champView !== 'none') state.show.champView = 'none';
+  state.schema = 3;
+  return state;
+}
+
 function fillDefaults(target, defaults) {
   for (const key of Object.keys(defaults)) {
     if (!(key in target)) target[key] = structuredClone(defaults[key]);
@@ -184,7 +211,7 @@ class Store extends EventEmitter {
       }
     }
     if (loaded) {
-      this.state = fillDefaults(loaded.state, defaultState());
+      this.state = migrate(fillDefaults(loaded.state, defaultState()));
       // 舊版允許 0 或負的併排間距（框會黏在一起或重疊），載入時改回預設
       const t4 = this.state.layouts && this.state.layouts.top4;
       if (t4 && t4.v && !(t4.v.close >= 12)) t4.v.close = 24; // 間距太小框會黏在一起
@@ -215,7 +242,7 @@ class Store extends EventEmitter {
 
   replaceState(state) {
     if (!isPlainObject(state)) throw new Error('state 格式錯誤');
-    this.state = fillDefaults(structuredClone(state), defaultState());
+    this.state = migrate(fillDefaults(structuredClone(state), defaultState()));
     this.rev++;
     this.emit('replace', this.rev);
     this.saveNow();
