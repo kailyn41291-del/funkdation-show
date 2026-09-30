@@ -818,8 +818,8 @@
       else if (ev.name === 'round') {
         shownRound = ev.round;
         headers(ev.round);
-        // 只有回合數淡入，FINAL／SEMI FINAL 等標題不動
-        if (effectsOn) [h2, h3b].forEach(function (el) { el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600 }); });
+        // 回合數與中文標題（四強賽／決賽）一起淡入，英文大標題 FINAL／SEMI FINAL 不動
+        if (effectsOn) [h2, h3].forEach(function (el) { el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600 }); });
         if (shownSeal) { if (sc.ctx.layout.seal.autoFade) fadeSeal(); else { FX.hide(SEAL.l); FX.hide(SEAL.r); shownSeal = null; } }
       } else if (ev.name === 'testTimer') testUntil = Date.now() + (sc.ctx.layout.timer.warn + 2) * 1000;
       else if (ev.name === 'testScore') animScore('l', (shownScore.l || 0) + 1);
