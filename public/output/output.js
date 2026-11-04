@@ -135,7 +135,10 @@
       set: function (team, x, y, w, h, pad, placeholder) {
         px(root, { left: x, top: y, width: w, height: h });
         var k = w / 840;
-        var p = pad * k;
+        // Logo 模式：不顯示外框、不留邊距，Logo 可以放大超出框
+        var logo = !!(team && team.photo && team.photo.logo);
+        var p = logo ? 0 : pad * k;
+        fr.style.display = logo ? 'none' : '';
         px(ph, { left: p, top: p, width: w - 2 * p, height: h - 2 * p });
         var fu = asset(S.frame) || FRAME_SVG;
         if (fr.getAttribute('src') !== fu) fr.src = fu;
@@ -151,7 +154,7 @@
         }
         var fitMode = photo ? photo.fit : 'contain';
         img.style.objectFit = fitMode === 'cover' ? 'cover' : 'contain';
-        ph.classList.toggle('free', !!(photo && photo.free));
+        ph.classList.toggle('free', !!(photo && (photo.free || photo.logo)));
         var zoom = photo ? photo.zoom : 100, ox = photo ? photo.x * k : 0, oy = photo ? photo.y * k : 0;
         img.style.transform = 'translate(' + ox + 'px,' + oy + 'px) scale(' + zoom / 100 + ')';
       }
@@ -338,11 +341,13 @@
   // ---------- 九隊總覽：上排 4 隊、下排 5 隊（隊數不是 9 時依「上排隊數」分配） ----------
   SCENES.overview = function (ctx) {
     var sc = baseScene(ctx);
+    // 表演賽的特邀隊伍不列入總覽
+    function lineup() { return S.teams.filter(function (t) { return !t.guest; }); }
     var hdA = Txt(sc.root, 'en'), hdB = Txt(sc.root, 'zh');
     hdA.t.classList.add('ls-title'); hdB.t.classList.add('ls-zh');
     var slots = [], ORDER = ['fr', 'ph', 'en', 'zh'];
     function build() {
-      var n = sc.ctx.layout.teams === false ? 0 : S.teams.length;
+      var n = sc.ctx.layout.teams === false ? 0 : lineup().length;
       while (slots.length < n) {
         var el = mk('div', 'slot', sc.root), b = PhotoBox(el), en = Txt(el, 'en'), zh = Txt(el, 'zh');
         en.t.classList.add('ls-name'); zh.t.classList.add('ls-zh');
@@ -365,8 +370,9 @@
       hdA.text(tx.title || ''); hdB.text(tx.zh || '');
       var hs = hdA.at(W / 2, v.hy, v.hs, W - 160);
       hdB.at(W / 2, v.hy + hs + v.hg, v.hz, W - 160);
+      var teams = lineup();
       slots.forEach(function (s, i) {
-        var t = S.teams[i];
+        var t = teams[i];
         px(s.el, { left: P[i].x, top: P[i].y, width: w, height: h });
         s.box.set(t, 0, 0, w, h, v.pad, c.preview);
         s.en.text(t ? t.en : '');
@@ -756,9 +762,9 @@
       pR.set(tR, xr, T, w, h, v.pad, c.preview && (!tR || tR._ph));
       var nameMax = Math.min(w + Math.max(0, v.pd * 2 - 40), W / 2 - 40);
       [[enL, zhL, tL], [enR, zhR, tR]].forEach(function (a) {
-        var t = a[2];
-        a[0].text(t ? t.en : '');
-        a[1].text(t && t._ph ? t.tag : FDM.line2(S, t));
+        var t = a[2], hide = !!(t && t.photo && t.photo.logo && t.photo.noName); // Logo 已含隊名
+        a[0].text(t && !hide ? t.en : '');
+        a[1].text(hide ? '' : t && t._ph ? t.tag : FDM.line2(S, t));
       });
       // 左右隊名用同一個字級
       var es = fitGroup([{ txt: enL, x: xl + w / 2, y: T + h + v.ng, maxW: nameMax }, { txt: enR, x: xr + w / 2, y: T + h + v.ng, maxW: nameMax }], v.es);

@@ -203,3 +203,6 @@ table.grid input[type=text] { width: 100%; }
 .awards .aw { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
 .awards .aw .lab { width: 90px; flex: none; color: var(--muted); font-size: 13px; }
 .awards .aw select { flex: 1; }
+
+/* 黑色 Logo 縮圖在深色介面上看不到，改用米白底 */
+.thumb.logo { background: #e6d9c2; object-fit: contain; }

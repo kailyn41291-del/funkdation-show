@@ -38,6 +38,7 @@ app.use('/fonts', express.static(path.join(PUBLIC_DIR, 'fonts'), { maxAge: '7d' 
 app.use('/control', express.static(path.join(PUBLIC_DIR, 'control')));
 app.use('/output', express.static(path.join(PUBLIC_DIR, 'output')));
 app.use('/shared', express.static(path.join(PUBLIC_DIR, 'shared')));
+app.use('/builtin', express.static(path.join(PUBLIC_DIR, 'builtin'), { maxAge: '7d' }));
 app.use('/assets', express.static(store.assetsDir, { maxAge: 0 }));
 
 app.get('/api/state', (req, res) => res.json(store.snapshot()));

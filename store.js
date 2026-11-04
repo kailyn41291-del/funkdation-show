@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
-const { defaultState } = require('./default-state');
+const { defaultState, GUESTS, guestTeam, exhibitionCue } = require('./default-state');
 
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
@@ -23,7 +23,29 @@ const CHAMP_OLD = {
   v: { cw: 560, rw: 440, cTs: 40, cNs: 50, rTs: 30, rNs: 38 }
 };
 function migrate(state) {
-  if ((state.schema || 0) >= 3) return state;
+  if ((state.schema || 0) < 3) migrate3(state);
+  if ((state.schema || 0) < 4) migrate4(state);
+  return state;
+}
+// schema 4：加入特別邀請的表演賽（三十聯軍 VS 華岡藝校，用 Logo）
+function migrate4(state) {
+  state.teams = state.teams || [];
+  if (!state.teams.some(t => t.guest)) {
+    for (const g of GUESTS) if (!state.teams.some(t => t.id === g[0])) state.teams.push(guestTeam(g));
+  }
+  state.cues = state.cues || [];
+  if (!state.cues.some(c => c.type === 'battle' && c.battle === 'exhibition')) {
+    // 放在「評審討論」之後；找不到就放在四強公布之前
+    let at = state.cues.findIndex(c => c.id === 'c-judge');
+    if (at >= 0) at++;
+    else { at = state.cues.findIndex(c => c.type === 'top4'); if (at < 0) at = state.cues.length; }
+    const cue = exhibitionCue();
+    if (state.cues.some(c => c.id === cue.id)) cue.id = 'c-exhib-' + Date.now().toString(36);
+    state.cues.splice(at, 0, cue);
+  }
+  state.schema = 4;
+}
+function migrate3(state) {
   const def = defaultState();
   for (const [k, L] of Object.entries(state.layouts || {})) {
     if (k !== 'champ' || !L) continue;
@@ -41,7 +63,6 @@ function migrate(state) {
   }
   if (state.show && typeof state.show.champView === 'string' && state.show.champView !== 'none') state.show.champView = 'none';
   state.schema = 3;
-  return state;
 }
 
 function fillDefaults(target, defaults) {

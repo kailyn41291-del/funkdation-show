@@ -509,7 +509,7 @@
         } }),
         h('button', { text: '產生 9 隊', title: '依隊伍順序一次新增所有單隊展示 Cue', onclick: function () {
           var a = clone(S.cues), at = insertAt();
-          a.splice.apply(a, [at, 0].concat(S.teams.map(function (t) { return newCue('team', t.id); })));
+          a.splice.apply(a, [at, 0].concat(S.teams.filter(function (t) { return !t.guest; }).map(function (t) { return newCue('team', t.id); })));
           setCues(a);
         } }),
         h('button', { text: '產生評審', title: '依評審順序一次新增所有評審表演 Cue', onclick: function () {
@@ -692,8 +692,9 @@
     else add(pane, [h('h3', { text: FDM.TYPES[c.type] }), h('div', { class: 'btnrow' }, h('button', { text: '重播登場', onclick: replay }))]);
   }
 
-  function teamOptions(withEmpty) {
-    var o = S.teams.map(function (t, i) { return [t.id, (i + 1) + '. ' + t.en + (t.seed ? '（種子）' : '')]; });
+  // noGuest：四強、排舞賽冠軍等正式賽項目不列出表演賽的特邀隊伍
+  function teamOptions(withEmpty, noGuest) {
+    var o = S.teams.map(function (t, i) { return t.guest && noGuest ? null : [t.id, (i + 1) + '. ' + t.en + (t.seed ? '（種子）' : '') + (t.guest ? '（表演賽）' : '')]; }).filter(Boolean);
     return withEmpty ? [['', '（未選）']].concat(o) : o;
   }
 
@@ -702,7 +703,7 @@
     // 四強位置 0/1 = 對戰 1（第 1 名 vs 第 4 名），2/3 = 對戰 2（第 2 名 vs 第 3 名）
     function pick(i) {
       var rank = FDM.TOP4_RANK[i];
-      var s = sel(teamOptions(true), S.results.top4[i] || '', function (v, el) {
+      var s = sel(teamOptions(true, true), S.results.top4[i] || '', function (v, el) {
         if (v && S.results.top4.indexOf(v) >= 0 && S.results.top4.indexOf(v) !== i) { err.textContent = '這隊已經選過了'; el.value = S.results.top4[i] || ''; return; }
         err.textContent = '';
         var a = clone(S.results.top4); a[i] = v || null; setPath(['results', 'top4'], a);
@@ -753,7 +754,7 @@
           if (inp.value === '' || !Number.isInteger(v) || v < 0 || v > 50) { err.textContent = '請輸入 0 到 50 的整數'; return; }
           err.textContent = ''; score(c, k, 0, v); inp.value = '';
         } })),
-        h('div', { class: 'btns', style: 'margin-top:4px' }, h('button', { class: 'winbtn', 'data-side': k, text: '確認晉級', onclick: function () {
+        h('div', { class: 'btns', style: 'margin-top:4px' }, h('button', { class: 'winbtn', 'data-side': k, text: c.battle === 'exhibition' ? '確認勝方' : '確認晉級', onclick: function () {
           var b = battleOf(c);
           battleChange(c, { winner: b.winner === k ? null : k });
           renderCueList();
@@ -765,7 +766,7 @@
         card.classList.toggle('win', b.winner === k);
         var wb = card.querySelector('.winbtn');
         wb.classList.toggle('on', b.winner === k);
-        wb.textContent = b.winner === k ? '已晉級（再按取消）' : '確認晉級';
+        wb.textContent = c.battle === 'exhibition' ? (b.winner === k ? '勝方（再按取消）' : '確認勝方') : (b.winner === k ? '已晉級（再按取消）' : '確認晉級');
       });
       cards.appendChild(card);
     });
@@ -817,7 +818,7 @@
     onLive(function () { viewTx.textContent = '目前：' + (NAMES[S.show.champView] || S.show.champView); });
     // 排舞賽冠軍由評審決定，演出時直接在這裡選
     var showPick = c.runner && c.runner.source === 'team'
-      ? sel(teamOptions(true), c.runner.team || '', function (v) { setPath(cp.concat('runner'), { source: 'team', team: v || null }); renderCueList(); renderInspector(); })
+      ? sel(teamOptions(true, true), c.runner.team || '', function (v) { setPath(cp.concat('runner'), { source: 'team', team: v || null }); renderCueList(); renderInspector(); })
       : h('b', { text: show ? show.en : FDM.sourceLabel(c.runner) + '（未決定）' });
     add(pane, [
       h('div', { class: 'card awards' },
@@ -958,7 +959,7 @@
   function sourceSelect(value, onchange, withEmpty) {
     var opts = [
       withEmpty ? { group: '尚未決定', items: [['', '（未選，演出時再選）']] } : null,
-      { group: '指定隊伍', items: S.teams.map(function (t, i) { return ['team:' + t.id, (i + 1) + '. ' + t.en + (t.seed ? '（種子）' : '')]; }) },
+      { group: '指定隊伍', items: S.teams.map(function (t, i) { return ['team:' + t.id, (i + 1) + '. ' + t.en + (t.seed ? '（種子）' : '') + (t.guest ? '（表演賽）' : '')]; }) },
       { group: '自動帶入', items: [['top4:0', '晉級第 1 名'], ['top4:2', '晉級第 2 名'], ['top4:3', '晉級第 3 名'], ['top4:1', '晉級第 4 名'],
         ['winner:semi1', '四強對戰 1 勝方'], ['winner:semi2', '四強對戰 2 勝方'], ['winner:final', '決賽勝方'],
         ['loser:semi1', '四強對戰 1 敗方'], ['loser:semi2', '四強對戰 2 敗方'], ['loser:final', '決賽敗方']] }
@@ -1006,7 +1007,7 @@
     var ph = t.photo;
     add(pane, [h('h3', { text: t.en + ' 的照片' }),
       h('div', { class: 'btnrow', style: 'align-items:center' },
-        ph.src ? h('img', { class: 'thumb', src: '/' + (ph.trim || ph.src), alt: '' }) : null,
+        ph.src ? h('img', { class: 'thumb' + (ph.logo ? ' logo' : ''), src: '/' + (ph.trim || ph.src), alt: '' }) : null,
         uploadBtn(ph.src ? '更換照片' : '上傳照片', 'image/*', false, function (f) {
           processPhoto(f[0]).then(function (r) {
             setPath(pp, Object.assign(clone(getAt(S, pp)), { src: r.src, trim: r.trim, fit: 'auto', zoom: 100, x: 0, y: 0 }));
@@ -1023,6 +1024,9 @@
       sl(pp.concat('x'), '左右位置', -1200, 1200, { def: 0 }),
       sl(pp.concat('y'), '上下位置', -900, 900, { def: 0 }),
       fld('出框', chk('允許人物超出外框（去背照片適用）', pp.concat('free'))),
+      fld('Logo 模式', chk('用 Logo 代替隊伍照片：不顯示外框，Logo 可放大超出框', pp.concat('logo'), function () { redraw(); })),
+      ph.logo ? fld('隊名', chk('對戰畫面不顯示隊名（Logo 已含隊名）', pp.concat('noName'))) : null,
+      ph.logo ? h('div', { class: 'hint', text: 'Logo 請用透明背景 PNG。用「照片縮放」放大、「上下位置」往上移，讓 Logo 底部對齊隊名上方。' }) : null,
       ph.fit === 'auto' && ph.src && !ph.trim ? h('div', { class: 'hint', text: '這張照片沒有透明背景，自動 Fit 會以完整顯示處理。' }) : null]);
   }
 
@@ -1114,10 +1118,12 @@
   // ---------- 對戰 ----------
   function battleBasic(pane, c, cp, lp) {
     add(pane, [nameField(cp), h('h3', { text: '對戰' }),
-      fld('場次', sel([['semi1', '四強對戰 1'], ['semi2', '四強對戰 2'], ['final', '決賽']], c.battle, function (v) {
+      fld('場次', sel([['semi1', '四強對戰 1'], ['semi2', '四強對戰 2'], ['final', '決賽'], ['exhibition', '表演賽（特邀隊伍）']], c.battle, function (v) {
+        var gs = S.teams.filter(function (t) { return t.guest; });
         var m = { semi1: ['SEMI FINAL', '四強賽', 4, { source: 'top4', index: 0 }, { source: 'top4', index: 1 }, '四強對戰 1'],
           semi2: ['SEMI FINAL', '四強賽', 4, { source: 'top4', index: 2 }, { source: 'top4', index: 3 }, '四強對戰 2'],
-          final: ['FINAL', '決賽', 5, { source: 'winner', battle: 'semi1' }, { source: 'winner', battle: 'semi2' }, '決賽'] }[v];
+          final: ['FINAL', '決賽', 5, { source: 'winner', battle: 'semi1' }, { source: 'winner', battle: 'semi2' }, '決賽'],
+          exhibition: ['EXHIBITION', '表演賽', 4, { source: 'team', team: gs[0] ? gs[0].id : null }, { source: 'team', team: gs[1] ? gs[1].id : null }, '表演賽'] }[v];
         var n = Object.assign(clone(c), { battle: v, title: m[0], zh: m[1], rounds: m[2], left: m[3], right: m[4], name: m[5] });
         setPath(cp, n); renderCueList(); renderInspector();
       }), '比分與印章依場次記錄'),
@@ -1238,7 +1244,7 @@
   }
   // ---------- 九隊總覽（上 4 下 5） ----------
   function overviewBasic(pane, c, cp, lp) {
-    var n = S.teams.length, top = getAt(S, lp.concat('top')), rows = FDM.overviewRows(n, top);
+    var n = S.teams.filter(function (t) { return !t.guest; }).length, top = getAt(S, lp.concat('top')), rows = FDM.overviewRows(n, top);
     add(pane, [nameField(cp), h('h3', { text: '排列' }),
       fld('顯示隊伍', chk('在底圖上排出所有隊伍的照片與隊名', lp.concat('teams'), function () { renderInspector(); })),
       fld('上排隊數', sel(Array.from({ length: n + 1 }, function (_, i) { return [String(i), '上 ' + i + '／下 ' + (n - i)]; }), String(rows[0]), function (v) { setPath(lp.concat('top'), Number(v)); renderInspector(); }), '預設上 4 下 5'),
@@ -1304,18 +1310,19 @@
     var right = h('div', { class: 'sticky' }, mon.el, h('div', { class: 'card' }, t ? h('div', { id: 'photoEd' }) : null));
     if (t) photoEditor(right.querySelector('#photoEd'), t, function () { renderPage(true); });
     var table = h('table', { class: 'grid' },
-      h('thead', null, h('tr', null, ['#', '照片', '英文隊名', '中文隊名', '標籤（城市）', '種子', ''].map(function (x) { return h('th', { text: x }); }))),
+      h('thead', null, h('tr', null, ['#', '照片', '英文隊名', '中文隊名', '標籤（城市）', '種子', '表演賽', ''].map(function (x) { return h('th', { text: x }); }))),
       h('tbody', null, S.teams.map(function (tm, i) {
         var tr = h('tr', { class: tm.id === ui.team ? 'sel' : '', onclick: function (e) {
           if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
           ui.team = tm.id; saveUi(); renderPage(false);
         } },
         h('td', { class: 'faint', text: i + 1 }),
-        h('td', null, tm.photo.src ? h('img', { class: 'thumb', src: '/' + (tm.photo.trim || tm.photo.src), alt: '' }) : h('span', { class: 'faint', text: '未上傳' })),
+        h('td', null, tm.photo.src ? h('img', { class: 'thumb' + (tm.photo.logo ? ' logo' : ''), src: '/' + (tm.photo.trim || tm.photo.src), alt: '' }) : h('span', { class: 'faint', text: '未上傳' })),
         h('td', null, txtPath(['teams', i, 'en'], 'TEAM NAME')),
         h('td', null, txtPath(['teams', i, 'zh'], '選填')),
         h('td', null, txtPath(['teams', i, 'tag'], '選填')),
         h('td', null, (function () { var c = h('input', { type: 'checkbox', checked: !!tm.seed }); c.addEventListener('change', function () { setPath(['teams', i, 'seed'], c.checked); }); return c; })()),
+        h('td', null, (function () { var c = h('input', { type: 'checkbox', checked: !!tm.guest, title: '特別邀請的表演賽隊伍：不列入九隊總覽、四強與頒獎選單' }); c.addEventListener('change', function () { setPath(['teams', i, 'guest'], c.checked); renderPage(false); }); return c; })()),
         h('td', { style: 'white-space:nowrap' },
           h('button', { class: 'ghost', text: '↑', title: '上移', onclick: function () { moveTeam(i, -1); } }),
           h('button', { class: 'ghost', text: '↓', title: '下移', onclick: function () { moveTeam(i, 1); } }),
@@ -1328,7 +1335,7 @@
     add(wrap, h('div', { class: 'split' },
       h('div', null,
         h('h2', { text: '隊伍資料', style: 'margin:0 0 4px' }),
-        h('div', { class: 'hint', text: '點一列可在右側調整這隊的照片。順序只影響「產生 9 隊」；實際出場順序以 Cue 表為準。' }),
+        h('div', { class: 'hint', text: '點一列可在右側調整這隊的照片。順序影響「產生 9 隊」與九隊總覽；實際出場順序以 Cue 表為準。勾「表演賽」的特邀隊伍不會列入九隊總覽、四強與頒獎。' }),
         table,
         h('div', { class: 'btnrow', style: 'margin-top:12px' },
           h('button', { text: '＋ 新增隊伍', onclick: function () {

@@ -15,6 +15,21 @@ const TEAM_LIST = [
   ['t9', 'LOCK’N’LOL CREW', 'SEOUL', true]
 ];
 
+// 特別邀請的表演賽隊伍：沒有隊伍照片，用 Logo（程式內建，public/builtin）
+const GUESTS = [
+  ['g1', '三十聯軍', 'builtin/guest-sanshi.png'],
+  ['g2', '華岡藝校', 'builtin/guest-huagang.png']
+];
+const guestTeam = ([id, en, src]) => ({
+  id, en, zh: '', tag: '', seed: false, guest: true,
+  photo: { src, trim: null, fit: 'contain', zoom: 170, x: 0, y: 0, logo: true, noName: true }
+});
+const exhibitionCue = () => ({
+  id: 'c-exhib', type: 'battle', battle: 'exhibition', name: '表演賽',
+  left: { source: 'team', team: 'g1' }, right: { source: 'team', team: 'g2' },
+  title: 'EXHIBITION', zh: '表演賽', rounds: 4, seconds: 60, own: false
+});
+
 const step = (fx) => ({ fx, dur: 0, extra: 0 });
 const bg = () => ({ mode: 'color', color: '#8b2420', src: null, sound: false, texture: true });
 
@@ -115,6 +130,7 @@ function defaultCues() {
   TEAM_LIST.forEach(([id], i) => cues.push({ id: 'c-team' + (i + 1), type: 'team', team: id }));
   cues.push(
     { id: 'c-judge', type: 'idle', name: '評審討論' },
+    exhibitionCue(),
     { id: 'c-top4', type: 'top4', name: '四強公布' },
     {
       id: 'c-semi1', type: 'battle', battle: 'semi1', name: '四強對戰 1',
@@ -142,7 +158,7 @@ function defaultCues() {
 
 function defaultState() {
   return {
-    schema: 3,
+    schema: 4,
     event: {
       title: 'FUNKDATION VOL.4',
       fonts: [],
@@ -158,7 +174,7 @@ function defaultState() {
     teams: TEAM_LIST.map(([id, en, tag, seed]) => ({
       id, en, zh: '', tag, seed,
       photo: { src: null, trim: null, fit: 'auto', zoom: 100, x: 0, y: 0 }
-    })),
+    })).concat(GUESTS.map(guestTeam)),
     judges: [1, 2, 3].map(n => person('j' + n, 'JUDGE ' + n)),
     mcs: [person('m1', 'MC NAME')],
     djs: [person('d1', 'DJ NAME')],
@@ -169,7 +185,7 @@ function defaultState() {
     },
     results: {
       top4: [null, null, null, null],
-      battles: { semi1: emptyBattle(), semi2: emptyBattle(), final: emptyBattle() }
+      battles: { semi1: emptyBattle(), semi2: emptyBattle(), final: emptyBattle(), exhibition: emptyBattle() }
     },
     cues: defaultCues(),
     layouts: defaultLayouts(),
@@ -185,4 +201,4 @@ function defaultState() {
   };
 }
 
-module.exports = { defaultState, defaultLayouts, emptyBattle };
+module.exports = { defaultState, defaultLayouts, emptyBattle, GUESTS, guestTeam, exhibitionCue };

@@ -27,7 +27,7 @@
   var TOP4_RANK = [1, 4, 2, 3];
   function top4Label(i) { return '晉級第 ' + TOP4_RANK[i] + ' 名'; }
 
-  var BATTLES = { semi1: '四強對戰 1', semi2: '四強對戰 2', final: '決賽' };
+  var BATTLES = { semi1: '四強對戰 1', semi2: '四強對戰 2', final: '決賽', exhibition: '表演賽' };
 
   var FX_IN = [
     ['ink', '潑墨暈開'], ['brush', '毛筆刷出'], ['fade', '淡入'],
