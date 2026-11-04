@@ -167,7 +167,8 @@
   function findCue(id) {
     if (!S || !id) return null;
     if (id.indexOf('__team:') === 0) return { id: id, type: 'team', team: id.slice(7) };
-    if (id.indexOf('__judge:') === 0) return { id: id, type: 'judge', judge: id.slice(8) };
+    var pm = /^__(judge|mc|dj):(.*)$/.exec(id);
+    if (pm) return { id: id, type: pm[1], judge: pm[2] };
     if (id === '__idle') return { id: id, type: 'idle' };
     for (var i = 0; i < S.cues.length; i++) if (S.cues[i].id === id) return S.cues[i];
     return null;
@@ -334,7 +335,67 @@
     return sc;
   };
 
-  SCENES.overview = function (ctx) { return baseScene(ctx); };
+  // ---------- 九隊總覽：上排 4 隊、下排 5 隊（隊數不是 9 時依「上排隊數」分配） ----------
+  SCENES.overview = function (ctx) {
+    var sc = baseScene(ctx);
+    var hdA = Txt(sc.root, 'en'), hdB = Txt(sc.root, 'zh');
+    hdA.t.classList.add('ls-title'); hdB.t.classList.add('ls-zh');
+    var slots = [], ORDER = ['fr', 'ph', 'en', 'zh'];
+    function build() {
+      var n = sc.ctx.layout.teams === false ? 0 : S.teams.length;
+      while (slots.length < n) {
+        var el = mk('div', 'slot', sc.root), b = PhotoBox(el), en = Txt(el, 'en'), zh = Txt(el, 'zh');
+        en.t.classList.add('ls-name'); zh.t.classList.add('ls-zh');
+        slots.push({ el: el, box: b, en: en, zh: zh, EL: { fr: b.fr, ph: b.ph, en: en.t, zh: zh.t } });
+      }
+      while (slots.length > n) slots.pop().el.remove();
+    }
+    function positions() {
+      var v = sc.ctx.layout.v, rows = FDM.overviewRows(slots.length, sc.ctx.layout.top), out = [];
+      [[rows[0], v.y1], [rows[1], v.y2]].forEach(function (r) {
+        var tot = r[0] * v.w + Math.max(0, r[0] - 1) * v.gx, x0 = (W - tot) / 2;
+        for (var i = 0; i < r[0]; i++) out.push({ x: x0 + i * (v.w + v.gx), y: r[1] });
+      });
+      return out;
+    }
+    sc.update = function (c) {
+      sc.ctx = c;
+      build();
+      var L = c.layout, v = L.v, tx = L.text || {}, w = v.w, h = Math.round(w * 2 / 3), P = positions();
+      hdA.text(tx.title || ''); hdB.text(tx.zh || '');
+      var hs = hdA.at(W / 2, v.hy, v.hs, W - 160);
+      hdB.at(W / 2, v.hy + hs + v.hg, v.hz, W - 160);
+      slots.forEach(function (s, i) {
+        var t = S.teams[i];
+        px(s.el, { left: P[i].x, top: P[i].y, width: w, height: h });
+        s.box.set(t, 0, 0, w, h, v.pad, c.preview);
+        s.en.text(t ? t.en : '');
+        s.zh.text(FDM.line2(S, t));
+      });
+      // 九隊隊名同一個字級（以最長的隊名為準縮小）
+      var maxW = w + v.gx - 8;
+      var es = fitGroup(slots.map(function (s) { return { txt: s.en, x: w / 2, y: h + v.ng, maxW: maxW }; }), v.es);
+      fitGroup(slots.map(function (s) { return { txt: s.zh, x: w / 2, y: h + v.ng + es + v.lg, maxW: maxW }; }), v.zs);
+    };
+    function all(fn) { fn(hdA.t); fn(hdB.t); slots.forEach(function (s) { ORDER.forEach(function (k) { fn(s.EL[k]); }); }); }
+    sc.showStatic = function () { all(FX.show); };
+    sc.enter = function () {
+      var tl = sc.restart(), L = sc.ctx.layout;
+      all(FX.hide);
+      var H = FDM.chain(['hd'], L.anim, 0, effectsOn);
+      tl.at(0, function () { FX.run(hdA.t, H.hd.fx, H.hd.dur, tl); });
+      tl.at(H.hd.dur * 0.3, function () { FX.run(hdB.t, H.hd.fx, H.hd.dur, tl); });
+      var base = (hdA.t.textContent || hdB.t.textContent) ? H.hd.dur * (L.anim.overlap / 100) : 0;
+      var stg = effectsOn ? (L.anim.stagger || 0) : 0;
+      slots.forEach(function (s, i) {
+        var a = FDM.chain(ORDER, L.anim, base + i * stg, effectsOn);
+        ORDER.forEach(function (k) { tl.at(a[k].start, function () { FX.run(s.EL[k], a[k].fx, a[k].dur, tl); }); });
+      });
+    };
+    sc.event = function (ev) { if (ev.name === 'entrance') sc.enter(); };
+    sc.update(ctx);
+    return sc;
+  };
   SCENES.black = function (ctx) { return baseScene(ctx); };
 
   // ---------- 單隊展示 ----------
@@ -401,7 +462,7 @@
     var r = String(L.ratio || '3:2').split(':');
     return (Number(r[1]) || 2) / (Number(r[0]) || 3);
   }
-  SCENES.judge = function (ctx) {
+  SCENES.judge = SCENES.mc = SCENES.dj = function (ctx) {
     var sc = baseScene(ctx);
     function T(cls, ls) { var x = Txt(sc.root, cls); x.t.classList.add(ls); return x; }
     var leadA = T('en', 'ls-lead'), leadB = T('zh', 'ls-zh');
@@ -413,8 +474,8 @@
     var LEAD = [leadA.t, leadB.t];
     var visible = true;
     function judge() {
-      var j = FDM.judgeById(S, sc.ctx.cue.judge);
-      if (!j && sc.ctx.preview) j = { en: '（未選評審）', photo: null, _ph: true };
+      var cue = sc.ctx.cue, j = FDM.personById(S, cue.type, cue.judge);
+      if (!j && sc.ctx.preview) j = { en: '（未選' + FDM.PEOPLE[cue.type].label + '）', photo: null, _ph: true };
       return j;
     }
     sc.update = function (c) {
@@ -1012,7 +1073,7 @@
   var preloaded = {}, preloadSig = '';
   function preloadAssets() {
     var list = [S.frame];
-    S.teams.concat(S.judges || []).forEach(function (t) { if (t.photo) list.push(t.photo.trim || t.photo.src); });
+    S.teams.concat(S.judges || [], S.mcs || [], S.djs || []).forEach(function (t) { if (t.photo) list.push(t.photo.trim || t.photo.src); });
     S.sponsors.logos.forEach(function (l) { list.push(l.src); });
     for (var k in S.layouts) {
       var L = S.layouts[k];
@@ -1092,7 +1153,7 @@
       v(W / 2 - q.sd, true); v(W / 2 + q.sd, true); h(q.sy, true);
     } else if (cue && cue.type === 'team' && L) {
       var t = L.v; h(t.pt + Math.round(t.pw * 2 / 3) / 2);
-    } else if (cue && cue.type === 'judge' && L) {
+    } else if (cue && FDM.isPerson(cue.type) && L) {
       var jv = L.v; h(jv.pt + Math.round(jv.pw * ratioOf(L)) / 2);
     }
   }
@@ -1102,7 +1163,7 @@
   function prewarm() {
     if (!S) return;
     var ev = S.event, texts = [], sig;
-    S.teams.concat(S.judges || []).forEach(function (t) { texts.push(t.en, t.zh, t.tag); });
+    S.teams.concat(S.judges || [], S.mcs || [], S.djs || []).forEach(function (t) { texts.push(t.en, t.zh, t.tag); });
     S.cues.forEach(function (c) { texts.push(c.title, c.zh); });
     for (var k in S.layouts) {
       var L = S.layouts[k];

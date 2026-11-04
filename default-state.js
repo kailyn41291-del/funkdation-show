@@ -22,28 +22,43 @@ function emptyBattle() {
   return { l: 0, r: 0, round: 1, seal: null, winner: null, hist: [] };
 }
 
+function personLayout(text) {
+  return {
+    bg: bg(),
+    intro: true,
+    ratio: '3:2',
+    text,
+    v: { pw: 760, px: 0, pt: 230, pad: 40, ng: 40, es: 76, zs: 36, lg: 18, tS: 34, tG: 30, lEs: 96, lZs: 40, lY: 440, lG: 28 },
+    anim: {
+      duration: 500, overlap: 60,
+      steps: { lt: step('ink'), lz: step('ink'), fr: step('fade'), ph: step('ink'), en: step('brush'), zh: step('brush'), tt: step('ink') }
+    },
+    pause: 1500, leadOut: 'fade'
+  };
+}
+
+const person = (id, en) => ({ id, en, zh: '', tag: '', photo: { src: null, trim: null, fit: 'auto', zoom: 100, x: 0, y: 0 } });
+
 function defaultLayouts() {
   return {
     idle: { bg: bg(), marquee: true },
-    overview: { bg: bg() },
+    overview: {
+      bg: bg(),
+      teams: true, top: 4,
+      text: { title: 'LINE UP', zh: '參賽隊伍' },
+      v: { w: 310, gx: 40, y1: 300, y2: 650, pad: 24, ng: 16, es: 30, zs: 18, lg: 8, hy: 130, hs: 64, hz: 26, hg: 18 },
+      anim: { duration: 500, overlap: 60, stagger: 160, steps: { hd: step('ink'), fr: step('fade'), ph: step('ink'), en: step('brush'), zh: step('brush') } }
+    },
     black: {},
     team: {
       bg: bg(),
       v: { pw: 840, px: 0, pt: 180, pad: 40, ng: 44, es: 76, zs: 36, lg: 18 },
       anim: { duration: 500, overlap: 60, steps: { fr: step('fade'), ph: step('ink'), en: step('brush'), zh: step('brush') } }
     },
-    judge: {
-      bg: bg(),
-      intro: true,
-      ratio: '3:2',
-      text: { lead: 'NEXT JUDGE IS...', leadZh: '下一位評審', title: 'JUDGE' },
-      v: { pw: 760, px: 0, pt: 230, pad: 40, ng: 40, es: 76, zs: 36, lg: 18, tS: 34, tG: 30, lEs: 96, lZs: 40, lY: 440, lG: 28 },
-      anim: {
-        duration: 500, overlap: 60,
-        steps: { lt: step('ink'), lz: step('ink'), fr: step('fade'), ph: step('ink'), en: step('brush'), zh: step('brush'), tt: step('ink') }
-      },
-      pause: 1500, leadOut: 'fade'
-    },
+    // 評審表演、MC 介紹、DJ 介紹共用版面結構，各自獨立設定
+    judge: personLayout({ lead: 'NEXT JUDGE IS...', leadZh: '下一位評審', title: 'JUDGE' }),
+    mc: personLayout({ lead: 'YOUR MC IS...', leadZh: '本場主持', title: 'MC' }),
+    dj: personLayout({ lead: 'YOUR DJ IS...', leadZh: '本場 DJ', title: 'DJ' }),
     top4: {
       bg: bg(),
       mode: 'step',
@@ -144,10 +159,9 @@ function defaultState() {
       id, en, zh: '', tag, seed,
       photo: { src: null, trim: null, fit: 'auto', zoom: 100, x: 0, y: 0 }
     })),
-    judges: [1, 2, 3].map(n => ({
-      id: 'j' + n, en: 'JUDGE ' + n, zh: '', tag: '',
-      photo: { src: null, trim: null, fit: 'auto', zoom: 100, x: 0, y: 0 }
-    })),
+    judges: [1, 2, 3].map(n => person('j' + n, 'JUDGE ' + n)),
+    mcs: [person('m1', 'MC NAME')],
+    djs: [person('d1', 'DJ NAME')],
     sponsors: {
       logos: [],
       speed: 120, height: 80, gap: 100, y: 1000, direction: -1,

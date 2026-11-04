@@ -96,16 +96,40 @@ async function state() { return (await (await fetch(BASE + '/api/state')).json()
   check('照片比例改成直式 4:5', box[0] === 480 && box[1] === 600, box.join('×'));
   await ops([{ op: 'set', path: ['layouts', 'judge', 'ratio'], value: '3:2' }, { op: 'set', path: ['layouts', 'judge', 'v', 'pw'], value: 760 }, { op: 'set', path: ['layouts', 'judge', 'v', 'pt'], value: 230 }]);
 
+  // MC／DJ：同一套版面、各自的文字與資料
+  await ops([
+    { op: 'set', path: ['mcs', 0, 'en'], value: 'MC LUCKY' },
+    { op: 'set', path: ['djs', 0, 'en'], value: 'DJ SPIN' },
+    { op: 'set', path: ['cues'], value: (await state()).cues.concat([{ id: 'c-mc', type: 'mc', judge: 'm1' }, { id: 'c-dj', type: 'dj', judge: 'd1' }]) },
+    { op: 'set', path: ['show', 'cueId'], value: 'c-mc' }, { op: 'set', path: ['show', 'seq'], value: 9 }, { op: 'set', path: ['show', 'teamOut'], value: false }
+  ]);
+  await sleep(2600); // 前一位評審先退場，再出現 MC 懸念文字
+  let txt = await out.evaluate(() => [...[...document.querySelectorAll('.scene')].pop().querySelectorAll('.txt .t')].filter(t => getComputedStyle(t).opacity > 0.5).map(t => t.textContent));
+  check('MC 介紹：先出現 YOUR MC IS...', txt.includes('YOUR MC IS...'), txt.join(' / '));
+  await sleep(3600);
+  txt = await out.evaluate(() => [...[...document.querySelectorAll('.scene')].pop().querySelectorAll('.txt .t')].filter(t => getComputedStyle(t).opacity > 0.5).map(t => t.textContent));
+  check('MC 登場：名字與稱號 MC', txt.includes('MC LUCKY') && txt.includes('MC'), txt.join(' / '));
+  await ops([{ op: 'set', path: ['show', 'cueId'], value: 'c-dj' }, { op: 'set', path: ['show', 'seq'], value: 10 }]);
+  await sleep(7500);
+  txt = await out.evaluate(() => [...[...document.querySelectorAll('.scene')].pop().querySelectorAll('.txt .t')].filter(t => getComputedStyle(t).opacity > 0.5).map(t => t.textContent));
+  await out.screenshot({ path: path.join(SHOTS, 'judge-6-dj.png') });
+  check('DJ 登場：名字與稱號 DJ', txt.includes('DJ SPIN') && txt.includes('DJ'), txt.join(' / '));
+
   // 控制台
   const ctrl = await browser.newPage({ viewport: { width: 1500, height: 920 } });
   ctrl.on('pageerror', e => errors.push('control: ' + e.message));
   ctrl.on('console', m => { if (m.type() === 'error' && !/WebSocket|ERR_CONNECTION/.test(m.text())) errors.push('control console: ' + m.text()); });
   await ctrl.goto(BASE + '/control/');
   await ctrl.waitForSelector('.brand');
-  await ctrl.getByRole('button', { name: '評審', exact: true }).click();
+  await ctrl.getByRole('button', { name: '評審／MC／DJ', exact: true }).click();
   await sleep(1200);
   await ctrl.screenshot({ path: path.join(SHOTS, 'judge-4-page.png') });
   check('評審頁列出 3 位評審', await ctrl.locator('table.grid tbody tr').count() === 3);
+  await ctrl.locator('.seg button', { hasText: 'MC' }).click();
+  await sleep(600);
+  check('切到 MC 資料', await ctrl.locator('table.grid tbody tr').count() === 1 && (await ctrl.locator('h2').first().textContent()) === 'MC資料');
+  await ctrl.locator('.seg button', { hasText: '評審' }).click();
+  await sleep(600);
   await ctrl.getByRole('button', { name: '＋ 新增評審' }).click();
   await sleep(500);
   s = await state();
@@ -132,12 +156,17 @@ async function state() { return (await (await fetch(BASE + '/api/state')).json()
   await sleep(500);
   s = await state();
   check('「產生評審」一次加入全部評審', s.cues.length === before + 4 && s.cues.filter(c => c.type === 'judge').length === 6, s.cues.length + ' 個 Cue');
+  // MC Cue 的編排分頁
+  await ctrl.locator('.cue[data-id="c-mc"]').click();
+  await sleep(400);
+  for (const tab of ['基本', '文字', '照片', '版面', '動畫']) { await ctrl.locator('.tabs button', { hasText: tab }).click(); await sleep(250); }
+  check('MC Cue 的 5 個設定分頁都能開', errors.length === 0, errors.join(' | '));
 
   // 演出模式按鈕
   await ctrl.getByRole('button', { name: '演出', exact: true }).click();
   await sleep(600);
   const btns = await ctrl.locator('.pane button').allTextContents();
-  check('演出模式有重播／直接顯示／退場', ['重播（含懸念文字）', '直接顯示評審', '退場（X）'].every(b => btns.includes(b)), btns.join('、'));
+  check('演出模式有重播／直接顯示／退場', ['重播（含懸念文字）', '直接顯示DJ', '退場（X）'].every(b => btns.includes(b)), btns.join('、'));
   await ctrl.keyboard.press('x');
   await sleep(300);
   check('快捷鍵 X 退場', (await state()).show.teamOut === true);

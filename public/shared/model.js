@@ -15,6 +15,8 @@
     overview: '九隊總覽',
     team: '單隊展示',
     judge: '評審表演',
+    mc: 'MC 介紹',
+    dj: 'DJ 介紹',
     top4: '四強公布',
     battle: '對戰計分',
     champ: '冠軍公布',
@@ -39,10 +41,25 @@
     return null;
   }
 
-  function judgeById(state, id) {
-    if (!state || !id || !state.judges) return null;
-    for (var i = 0; i < state.judges.length; i++) if (state.judges[i].id === id) return state.judges[i];
+  // 評審／MC／DJ 共用同一種版面，資料分開存；Cue 上的 judge 欄位存人員 id
+  var PEOPLE = {
+    judge: { list: 'judges', label: '評審', prefix: 'j', ph: 'JUDGE' },
+    mc: { list: 'mcs', label: 'MC', prefix: 'm', ph: 'MC' },
+    dj: { list: 'djs', label: 'DJ', prefix: 'd', ph: 'DJ' }
+  };
+  function isPerson(type) { return !!PEOPLE[type]; }
+  function peopleOf(state, type) { var k = PEOPLE[type]; return (state && k && state[k.list]) || []; }
+  function personById(state, type, id) {
+    var list = peopleOf(state, type);
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
     return null;
+  }
+  function judgeById(state, id) { return personById(state, 'judge', id); }
+
+  // 九隊總覽：上排 top 隊、其餘在下排
+  function overviewRows(n, top) {
+    var t = Math.max(0, Math.min(n, top == null ? Math.floor(n / 2) : top));
+    return [t, n - t];
   }
 
   function battleCue(state, battleId) {
@@ -83,16 +100,16 @@
       var t = teamById(state, cue.team);
       return t ? t.en : '（未選隊伍）';
     }
-    if (cue.type === 'judge') {
-      var j = judgeById(state, cue.judge);
-      return j ? j.en : '（未選評審）';
+    if (PEOPLE[cue.type]) {
+      var j = personById(state, cue.type, cue.judge);
+      return j ? j.en : '（未選' + PEOPLE[cue.type].label + '）';
     }
     return cue.name || TYPES[cue.type] || cue.type;
   }
 
   function cueSub(state, cue) {
     if (cue.type === 'team') return TYPES.team;
-    if (cue.type === 'judge') return TYPES.judge;
+    if (PEOPLE[cue.type]) return TYPES[cue.type];
     if (cue.type === 'battle') {
       var l = resolve(state, cue.left), r = resolve(state, cue.right);
       return (l ? l.en : sourceLabel(cue.left)) + ' vs ' + (r ? r.en : sourceLabel(cue.right));
@@ -141,6 +158,7 @@
   };
   var PRESET_FX = {
     team: { std: { fr: 'fade', ph: 'ink', en: 'brush', zh: 'brush' }, sharp: { fr: 'slam', ph: 'slide', en: 'slide', zh: 'slide' } },
+    overview: { std: { hd: 'ink', fr: 'fade', ph: 'ink', en: 'brush', zh: 'brush' }, sharp: { hd: 'slam', fr: 'slam', ph: 'slide', en: 'slide', zh: 'slide' } },
     judge: {
       std: { lt: 'ink', lz: 'ink', fr: 'fade', ph: 'ink', en: 'brush', zh: 'brush', tt: 'ink' },
       sharp: { lt: 'slam', lz: 'slide', fr: 'slam', ph: 'slide', en: 'slide', zh: 'slide', tt: 'slam' }
@@ -153,6 +171,7 @@
     }
   };
   function presetAnim(type, key, anim) {
+    if (PEOPLE[type]) type = 'judge';
     var p = PRESETS[key], fx = PRESET_FX[type] && (PRESET_FX[type][key] || PRESET_FX[type].std);
     var out = JSON.parse(JSON.stringify(anim));
     out.duration = p.duration;
@@ -173,7 +192,7 @@
 
   global.FDM = {
     zhNum: zhNum, TYPES: TYPES, BATTLES: BATTLES, FX_IN: FX_IN, FX_OUT: FX_OUT,
-    teamById: teamById, judgeById: judgeById, TOP4_RANK: TOP4_RANK, top4Label: top4Label, battleCue: battleCue, resolve: resolve, sourceLabel: sourceLabel,
+    teamById: teamById, judgeById: judgeById, PEOPLE: PEOPLE, isPerson: isPerson, peopleOf: peopleOf, personById: personById, overviewRows: overviewRows, TOP4_RANK: TOP4_RANK, top4Label: top4Label, battleCue: battleCue, resolve: resolve, sourceLabel: sourceLabel,
     cueTitle: cueTitle, cueSub: cueSub, layoutKey: layoutKey, layoutFor: layoutFor,
     chain: chain, PRESETS: PRESETS, presetAnim: presetAnim, line2: line2
   };
