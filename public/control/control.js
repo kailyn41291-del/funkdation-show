@@ -324,6 +324,10 @@
       else { renderCueList(); renderInspector(); syncMonitors(); }
     } else {
       flowView = null;
+      if (ui.page !== 'settings') remoteCache = null;
+      // 其他裝置更新狀態時整頁會重畫：正在打字的遙控密碼欄要保留內容、游標與焦點
+      var ae = document.activeElement, keep = null;
+      if (remoteCache && ae && remoteCache.contains(ae)) keep = { el: ae, a: ae.selectionStart, b: ae.selectionEnd };
       var y = mainEl.firstChild ? mainEl.firstChild.scrollTop : 0;
       mainEl.innerHTML = '';
       monitors = [];
@@ -331,6 +335,10 @@
       mainEl.appendChild(page);
       ({ teams: pageTeams, judges: pageJudges, sponsors: pageSponsors, assets: pageAssets, settings: pageSettings })[ui.page](page);
       page.scrollTop = y;
+      if (keep && document.body.contains(keep.el)) {
+        keep.el.focus();
+        try { keep.el.setSelectionRange(keep.a, keep.b); } catch (e) { /* 核取方塊沒有游標 */ }
+      }
     }
     refreshLive();
   }
@@ -1500,7 +1508,10 @@
   // 設定頁
   // ---------------------------------------------------------------------------
   // 遙控網頁設定：密碼、網址與 QR Code（設定只存在這台電腦，不會同步給其他裝置）
+  // 這個區塊不跟著賽事狀態重畫（留在設定頁時重複使用同一個），打字才不會被清掉
+  var remoteCache = null;
   function remoteBox() {
+    if (remoteCache) return remoteCache;
     var box = h('div', { class: 'card remote' }, h('div', { class: 'faint', text: '讀取中…' }));
     function post(body) {
       return fetch('/api/remote/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -1543,6 +1554,7 @@
       }).catch(function () { box.replaceChildren(h('div', { class: 'faint', text: '無法讀取遙控設定' })); });
     }
     load();
+    remoteCache = box;
     return box;
   }
 

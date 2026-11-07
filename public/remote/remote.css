@@ -11,8 +11,10 @@ body {
   font: 15px/1.45 -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
   min-height: 100vh; min-height: 100dvh;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  -webkit-user-select: none; user-select: none;
 }
+/* 只有按鈕禁止選取文字；不要設在 body，iPhone Safari 會因此無法在輸入框打字 */
+button, .chip, .tabs, .side .num, .side .name { -webkit-user-select: none; user-select: none; }
+input, select { -webkit-user-select: auto; user-select: auto; }
 button, select, input { font: inherit; color: inherit; }
 button { cursor: pointer; touch-action: manipulation; }
 
@@ -25,7 +27,7 @@ button { cursor: pointer; touch-action: manipulation; }
 .login p { color: var(--muted); margin: 0 0 22px; font-size: 14px; }
 .login input {
   width: 100%; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line2);
-  background: var(--panel); font-size: 18px; letter-spacing: .08em; -webkit-user-select: text; user-select: text;
+  background: var(--panel); font-size: 18px; letter-spacing: .08em;
 }
 .login input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
 .login .primary { width: 100%; margin-top: 12px; padding: 14px; border-radius: 12px; border: 0; background: var(--accent); font-weight: 700; font-size: 17px; }

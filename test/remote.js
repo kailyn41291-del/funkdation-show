@@ -96,7 +96,10 @@ const state = async () => (await json(LOCAL + '/api/state')).body.state;
   await phone.click('button[type=submit]');
   await sleep(500);
   check('手機上密碼錯誤有提示', (await phone.textContent('.err')).includes('密碼不正確'));
-  await phone.fill('input[type=password]', 'funk2026');
+  await phone.fill('input[type=password]', '');
+  await phone.tap('input[type=password]');
+  await phone.keyboard.type('funk2026', { delay: 40 });   // 用鍵盤一個字一個字打，跟真人一樣
+  check('手機密碼欄可以打字', (await phone.inputValue('input[type=password]')) === 'funk2026');
   await phone.click('button[type=submit]');
   await phone.waitForSelector('.side .plus');
   await sleep(500);
@@ -135,6 +138,20 @@ const state = async () => (await json(LOCAL + '/api/state')).body.state;
   check('設定頁顯示已登入裝置數', (await ctrl.locator('.remote').textContent()).includes('已登入的裝置：2 台'));
   await ctrl.locator('.remote').scrollIntoViewIfNeeded();
   await ctrl.locator('.remote').screenshot({ path: path.join(SHOTS, 'remote-4-settings.png') });
+  // 在設定頁打密碼時，手機同時在加分（整頁會重畫）：打的字不能被清掉
+  const pwBox = ctrl.locator('.remote input[type=text]');
+  await pwBox.fill('');
+  await pwBox.click();
+  let n = 0;
+  const busyT = setInterval(() => { json(LAN + '/api/remote/score', { battle: 'semi2', side: 'l', delta: (n++ % 2) ? 1 : -1 }, tok); }, 150);
+  await ctrl.keyboard.type('typed5678', { delay: 90 });
+  clearInterval(busyT);
+  await sleep(300);
+  check('設定頁打密碼時有其他更新，字不會被清掉', (await ctrl.locator('.remote input[type=text]').inputValue()) === 'typed5678', await ctrl.locator('.remote input[type=text]').inputValue());
+  check('打字時游標一直在密碼欄', await ctrl.evaluate(() => document.activeElement && document.activeElement.closest('.remote') !== null));
+  await ctrl.getByRole('button', { name: '儲存密碼' }).click();
+  await sleep(600);
+  check('用設定頁的按鈕儲存密碼', (await json(LOCAL + '/api/remote/config')).body.password === 'typed5678');
 
   console.log('換密碼與暴力嘗試');
   await json(LOCAL + '/api/remote/config', { enabled: true, password: 'newpass99' });
