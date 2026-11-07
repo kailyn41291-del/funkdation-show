@@ -12,6 +12,7 @@ const multer = require('multer');
 const AdmZip = require('adm-zip');
 const { WebSocketServer } = require('ws');
 const { Store } = require('./store');
+const { createRemote, isLocal } = require('./remote');
 
 let PORT = Number(process.env.FD_PORT) || 3010;
 const DATA_DIR = process.env.FD_DATA || path.join(__dirname, 'data');
@@ -32,12 +33,26 @@ const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '20mb' }));
 
+// 遙控網頁：同網路其他裝置只能開遙控頁與輸出畫面，這台電腦本身不受影響
+const remote = createRemote({
+  dataDir: DATA_DIR, store, lanAddresses: () => lanAddresses(), getPort: () => PORT,
+  // 遙控指令跟控制台一樣：先送動畫事件，再套用修改
+  emit(ops, event) {
+    if (event) broadcast({ type: 'event', event, origin: 'remote' });
+    currentMeta = { origin: 'remote', id: null, quiet: false, event: event ? event.name : null };
+    try { return store.apply(ops); } finally { currentMeta = null; }
+  }
+});
+app.use(remote.gate);
+remote.routes(app);
+
 app.get('/', (req, res) => res.redirect('/control/'));
 app.get(['/favicon.svg', '/favicon.ico'], (req, res) => res.type('image/svg+xml').sendFile(path.join(PUBLIC_DIR, 'favicon.svg')));
 app.use('/fonts', express.static(path.join(PUBLIC_DIR, 'fonts'), { maxAge: '7d' }));
 app.use('/control', express.static(path.join(PUBLIC_DIR, 'control')));
 app.use('/output', express.static(path.join(PUBLIC_DIR, 'output')));
 app.use('/shared', express.static(path.join(PUBLIC_DIR, 'shared')));
+app.use('/remote', express.static(path.join(PUBLIC_DIR, 'remote')));
 app.use('/builtin', express.static(path.join(PUBLIC_DIR, 'builtin'), { maxAge: '7d' }));
 app.use('/assets', express.static(store.assetsDir, { maxAge: 0 }));
 
@@ -170,12 +185,15 @@ store.on('error-log', e => log('錯誤', e.message));
 
 wss.on('connection', (ws, req) => {
   ws.isAlive = true;
+  // 其他裝置（遙控網頁、另一台電腦的輸出畫面）只能讀取，修改一律走遙控指令
+  ws.readOnly = !isLocal(req);
   ws.on('pong', () => { ws.isAlive = true; });
   ws.send(JSON.stringify({ type: 'hello', rev: store.rev, savedRev: store.savedRev, state: store.state, serverTime: Date.now() }));
   ws.on('message', data => {
     let msg;
     try { msg = JSON.parse(data); } catch { return; }
     if (msg.type === 'ops') {
+      if (ws.readOnly) { ws.send(JSON.stringify({ type: 'nack', id: msg.id, error: '這台裝置只能讀取', rev: store.rev })); return; }
       try {
         // 動畫事件先送出，再送狀態，輸出畫面才能分辨「要播動畫」還是「直接套用」
         if (msg.event) broadcast({ type: 'event', event: msg.event, origin: msg.origin || null });
@@ -251,7 +269,7 @@ server.on('listening', () => {
   log(' FUNKDATION VOL.4 賽事播出系統已啟動');
   log(` 控制面板： http://localhost:${PORT}/control`);
   log(` 輸出畫面： http://localhost:${PORT}/output`);
-  for (const ip of lanAddresses()) log(` 同網路其他裝置： http://${ip}:${PORT}/control`);
+  for (const ip of lanAddresses()) log(` 遙控網頁（同 Wi-Fi 手機）： http://${ip}:${PORT}/remote`);
   log(' 關閉這個視窗即可結束（資料已自動存檔）');
   log('========================================');
   resolveReady(PORT);
