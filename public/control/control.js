@@ -1287,6 +1287,9 @@
     add(pane, [nameField(cp), h('h3', { text: '贊助商跑馬燈' }),
       fld('跑馬燈', chk('在主視覺上顯示贊助商跑馬燈', lp.concat('marquee'))),
       fld('四強選隊', chk('演出時在這個 Cue 顯示四強選隊（評審討論用）', cp.concat('pickTop4'))),
+      h('h3', { text: '切換' }),
+      sl(lp.concat('fade'), '淡入時間 ms', 0, 5000, { step: 50 }),
+      h('div', { class: 'hint', text: '切到主視覺待機時，底圖與贊助商跑馬燈淡入的時間（1000 = 1 秒）。所有主視覺待機 Cue 共用。' }),
       h('div', { class: 'btnrow' }, h('button', { text: '編輯贊助商 Logo →', onclick: function () { ui.page = 'sponsors'; saveUi(); renderHeader(); renderPage(false); } }))]);
     bgEditor(pane, lp.concat('bg'));
   }

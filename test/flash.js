@@ -82,6 +82,30 @@ async function upload(f) { const fd = new FormData(); fd.append('file', new Blob
     const pops = Object.values(hist).filter(h => h.ops[0] > 0.3 && h.ops.slice(1).some(v => v < 0.05)).map(h => h.cls);
     check(`切到「${c.name || c.type}」不跳閃`, pops.length === 0 && r.cover > 0.999, pops.length ? '跳閃：' + [...new Set(pops)].join(', ') : '底圖覆蓋最低 ' + r.cover.toFixed(3));
   }
+  // 主視覺待機的淡入時間：預設 1.2 秒，可調整；其他畫面維持 0.45 秒
+  async function fadeOf(cueId) {
+    await ops([{ op: 'set', path: ['show', 'cueId'], value: 'c-team1' }, { op: 'set', path: ['show', 'seq'], value: seq++ }]);
+    await sleep(1600);
+    const before = await p.evaluate(() => { const t = document.querySelector('.bg[style*="z-index: 2"]'); return t ? t.id : ''; });
+    await ops([{ op: 'set', path: ['show', 'cueId'], value: cueId }, { op: 'set', path: ['show', 'seq'], value: seq++ }]);
+    // 前一個畫面先退場，等新底圖換到上層開始淡入再量
+    await p.waitForFunction(b => { const t = document.querySelector('.bg[style*="z-index: 2"]'); return t && t.id !== b && t.classList.contains('on'); }, before, { timeout: 5000 }).catch(() => {});
+    await sleep(150);
+    return p.evaluate(() => {
+      const top = [...document.querySelectorAll('.bg')].sort((a, b) => (+b.style.zIndex || 0) - (+a.style.zIndex || 0))[0];
+      const band = [...document.querySelectorAll('#scenes .scene')].pop().querySelector('.band');
+      const an = band && band.getAnimations()[0];
+      return { bg: getComputedStyle(top).transitionDuration, band: an ? an.effect.getTiming().duration : null };
+    });
+  }
+  let f = await fadeOf('c-open');
+  check('主視覺待機預設淡入 1.2 秒（底圖與跑馬燈）', f.bg === '1.2s' && f.band === 1200, JSON.stringify(f));
+  await ops([{ op: 'set', path: ['layouts', 'idle', 'fade'], value: 2500 }]);
+  f = await fadeOf('c-open');
+  check('調成 2.5 秒', f.bg === '2.5s' && f.band === 2500, JSON.stringify(f));
+  f = await fadeOf('c-top4');
+  check('其他畫面不受影響（0.45 秒）', f.bg === '0.45s', JSON.stringify(f));
+
   check('沒有錯誤訊息', errors.length === 0, errors.join(' | '));
   await browser.close();
   console.log(fails ? '\n失敗 ' + fails + ' 項' : '\n全部通過');

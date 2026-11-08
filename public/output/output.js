@@ -231,7 +231,9 @@
       if (im.decode) im.decode().then(go, go); else { im.onload = go; im.onerror = go; }
     } else go();
   }
-  function applyBg(bg, instant) {
+  // dur：淡入時間（毫秒），主視覺待機可在版面設定調整，其他畫面 450
+  function applyBg(bg, instant, dur) {
+    dur = Math.max(0, Number(dur) || 450);
     bg = bg || { mode: 'color', color: '#000' };
     var sig = bgSignature(bg);
     document.body.classList.toggle('transparent', bg.mode === 'transparent');
@@ -282,17 +284,17 @@
     whenReady(layer, bg, function () {
       if (token !== bgToken) return;
       bgVisible = idx;
-      layer.style.transition = instant ? 'none' : '';
+      layer.style.transition = instant ? 'none' : 'opacity ' + dur + 'ms ease';
       layer.classList.add('on');
       // 透明底圖蓋不住舊底圖，舊的要一起淡出；其他情況等新底圖完全淡入後再把舊的收起來
-      if (bg.mode === 'transparent') { old.style.transition = instant ? 'none' : ''; old.classList.remove('on'); }
+      if (bg.mode === 'transparent') { old.style.transition = instant ? 'none' : 'opacity ' + dur + 'ms ease'; old.classList.remove('on'); }
       bgOldTimer = setTimeout(function () {
         if (token !== bgToken) return;
         old.style.transition = 'none';
         old.classList.remove('on');
         var ov = old.querySelector('video');
         if (ov) ov.pause();
-      }, instant ? 0 : 520);
+      }, instant ? 0 : dur + 70);
     });
   }
 
@@ -368,7 +370,7 @@
     }
     sc.loop = requestAnimationFrame(tick);
     sc.showStatic = function () { FX.show(band); };
-    sc.enter = function () { FX.run(band, effectsOn ? 'fade' : 'none', 600, sc.tl); };
+    sc.enter = function () { FX.run(band, effectsOn ? 'fade' : 'none', Math.max(300, Number(sc.ctx.layout.fade) || 600), sc.tl); };
     sc.update(ctx);
     return sc;
   };
@@ -1100,7 +1102,7 @@
     var ctx = ctxFor(cue);
     var make = SCENES[cue ? cue.type : 'black'] || SCENES.black;
     var sc = make(ctx);
-    applyBg(cue ? (cue.type === 'black' ? { mode: 'color', color: '#000', texture: false } : ctx.layout.bg) : { mode: 'color', color: '#000', texture: false }, !animated);
+    applyBg(cue ? (cue.type === 'black' ? { mode: 'color', color: '#000', texture: false } : ctx.layout.bg) : { mode: 'color', color: '#000', texture: false }, !animated, ctx.layout && ctx.layout.fade);
     if (animated) {
       // 等新畫面排版、圖片上傳到顯示卡後再開始動畫，第一格不會掉格
       requestAnimationFrame(function () { requestAnimationFrame(function () { if (sc.root.isConnected) sc.enter(); }); });
@@ -1171,7 +1173,7 @@
     if (current.scene) {
       var c = ctxFor(cue);
       current.scene.update(c, meta);
-      applyBg(cue ? (cue.type === 'black' ? { mode: 'color', color: '#000', texture: false } : c.layout.bg) : null, false);
+      applyBg(cue ? (cue.type === 'black' ? { mode: 'color', color: '#000', texture: false } : c.layout.bg) : null, false, c.layout && c.layout.fade);
       drawGuides();
     }
   }

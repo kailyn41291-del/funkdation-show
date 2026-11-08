@@ -56,7 +56,7 @@ const person = (id, en) => ({ id, en, zh: '', tag: '', photo: { src: null, trim:
 
 function defaultLayouts() {
   return {
-    idle: { bg: bg(), marquee: true },
+    idle: { bg: bg(), marquee: true, fade: 1200 },   // fade：切進來時底圖與跑馬燈的淡入時間（毫秒）
     overview: {
       bg: bg(),
       teams: true, top: 4,
