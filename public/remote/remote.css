@@ -100,3 +100,40 @@ main { padding: 14px 16px 32px; max-width: 720px; margin: 0 auto; }
   .side .num { font-size: 96px; }
   .side .plus { height: 96px; }
 }
+
+/* ---------- Timer ---------- */
+.timer { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px; margin-top: 12px; }
+.timer .thead { display: flex; justify-content: space-between; align-items: baseline; }
+.timer .lab { font-size: 12px; letter-spacing: .12em; color: var(--faint); }
+.timer .tstate { font-size: 13px; color: var(--muted); }
+.timer .tnum { font-size: 64px; font-weight: 800; text-align: center; line-height: 1.05; margin: 4px 0 10px; font-variant-numeric: tabular-nums; -webkit-user-select: none; user-select: none; }
+.timer .tnum.warn { color: var(--warn); }
+.timer .tnum.over { color: var(--danger); }
+.timer .tgo { width: 100%; height: 64px; border-radius: 14px; border: 0; background: var(--go); font-size: 22px; font-weight: 800; }
+.timer .tgo.pause { background: var(--warn); color: #1a1208; }
+.timer .trow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; }
+.timer .trow button { height: 46px; border-radius: 12px; border: 1px solid var(--line2); background: var(--panel2); font-weight: 700; }
+.timer .trow button.on { border-color: var(--accent); }
+.timer button:active { transform: scale(.97); filter: brightness(1.15); }
+
+/* ---------- Timer 專用畫面 ---------- */
+.tonly { max-width: 560px; }
+.tinfo { display: flex; gap: 10px; align-items: baseline; margin-bottom: 4px; min-width: 0; }
+.tinfo .lab { font-size: 12px; letter-spacing: .12em; color: var(--faint); flex: none; }
+.tinfo b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tmode .timer { padding: 16px; }
+.tmode .timer .tnum { font-size: clamp(88px, 30vw, 180px); margin: 8px 0 16px; }
+.tmode .timer .tgo { height: 96px; font-size: 30px; border-radius: 18px; }
+.tmode .timer .trow button { height: 58px; font-size: 17px; }
+.tcustom { display: flex; gap: 8px; margin-top: 12px; }
+.tcustom input { flex: 1; min-width: 0; padding: 12px; border-radius: 12px; border: 1px solid var(--line2); background: var(--panel); font-size: 17px; }
+.tcustom button { padding: 0 18px; border-radius: 12px; border: 1px solid var(--line2); background: var(--panel2); font-weight: 700; }
+/* 手機橫拿：數字和按鈕左右排 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .tmode .tonly { max-width: none; }
+  .tmode .timer { display: grid; grid-template-columns: 1.3fr 1fr; grid-template-areas: "head head" "num go" "num row"; column-gap: 16px; align-items: center; }
+  .tmode .timer .thead { grid-area: head; }
+  .tmode .timer .tnum { grid-area: num; font-size: clamp(80px, 22vw, 200px); margin: 0; }
+  .tmode .timer .tgo { grid-area: go; }
+  .tmode .timer .trow { grid-area: row; }
+}

@@ -230,3 +230,6 @@ table.grid input[type=text] { width: 100%; }
 .mini .nextline { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .hint.ok { color: var(--go-2); }
+
+.remote .pwgrid { display: grid; grid-template-columns: auto auto auto 1fr; gap: 8px 10px; align-items: center; margin-top: 12px; }
+.remote .qcap { font-size: 13px; }

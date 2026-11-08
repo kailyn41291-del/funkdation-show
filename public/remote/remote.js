@@ -8,6 +8,11 @@
   var KEY = 'fd-remote-token';
   var ui = { tab: 'score', battle: null, follow: true };
   var token = load(KEY);
+  // Timer 專用：網址 /timer（= /remote/?timer=1），或用 Timer 專用密碼登入
+  var TIMER_URL = /[?&]timer=1/.test(location.search);
+  var role = load('fd-remote-role') || 'full';
+  function timerOnly() { return TIMER_URL || role === 'timer'; }
+  if (TIMER_URL) document.title = 'FUNKDATION Timer';
   try { Object.assign(ui, JSON.parse(load('fd-remote-ui') || '{}')); } catch (e) { /* 忽略 */ }
 
   function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -63,18 +68,21 @@
       e.preventDefault();
       btn.disabled = true; err.textContent = '';
       api('/api/remote/login', { password: input.value }).then(function (j) {
-        token = j.token; save(KEY, token); start();
+        token = j.token; save(KEY, token);
+        role = j.role || 'full'; save('fd-remote-role', role);
+        start();
       }).catch(function (e2) { err.textContent = e2.message; btn.disabled = false; input.select(); });
     } },
-      h('div', { class: 'brand', text: 'FUNKDATION' }, h('small', { text: '遙控' })),
-      h('h1', { text: '比分遙控' }),
-      h('p', { text: '輸入控制台「設定 → 遙控網頁」顯示的密碼。手機要和播出電腦連同一個 Wi-Fi。' }),
+      h('div', { class: 'brand', text: 'FUNKDATION' }, h('small', { text: TIMER_URL ? 'Timer' : '遙控' })),
+      h('h1', { text: TIMER_URL ? 'Timer 控制' : '比分遙控' }),
+      h('p', { text: (TIMER_URL ? '輸入「Timer 專用密碼」或完整遙控密碼。' : '輸入控制台「設定 → 遙控網頁」顯示的密碼。') + '手機要和播出電腦連同一個 Wi-Fi。' }),
       input, btn, err);
     app.replaceChildren(h('div', { class: 'login' }, form));
     setTimeout(function () { input.focus(); }, 50);
   }
   function logout(msg) {
     token = null; save(KEY, null);
+    role = 'full'; save('fd-remote-role', null);
     if (fd && fd.close) fd.close();
     fd = null; S = null;
     loginView(msg);
@@ -113,7 +121,14 @@
           return h('button', { class: ui.tab === t[0] ? 'on' : '', role: 'tab', 'aria-selected': ui.tab === t[0] ? 'true' : 'false', text: t[1], onclick: function () { ui.tab = t[0]; saveUi(); render(); } });
         })));
     var main = h('main');
-    if (ui.tab === 'top4') top4View(main); else scoreView(main);
+    if (timerOnly()) {
+      // Timer 專用：沒有比分、四強分頁
+      top.querySelector('.tabs').remove();
+      top.querySelector('.brand small').textContent = 'Timer';
+      main.className = 'tonly';
+      timerOnlyView(main);
+      document.body.classList.add('tmode');
+    } else if (ui.tab === 'top4') top4View(main); else scoreView(main);
     app.replaceChildren(top, main);
   }
 
@@ -156,7 +171,72 @@
           h('button', { 'aria-label': '減 1 分', text: '−1', onclick: function () { hit(-1); } }))));
     });
     add(main, board);
-    add(main, h('div', { class: 'note', text: '比分會立即出現在輸出畫面（含動畫）。回合、印章、晉級與 Timer 請在控制台操作。' }));
+    add(main, timerCard());
+    add(main, h('div', { class: 'note', text: '比分與 Timer 會立即出現在輸出畫面。回合、印章與晉級請在控制台操作。' }));
+  }
+
+  // ---------- Timer ----------
+  function timerLeft() {
+    var t = S.show.timer || {};
+    if (t.endsAt) return Math.max(0, (t.endsAt - fd.now()) / 1000);
+    return t.pausedLeft != null ? t.pausedLeft : (t.duration || 0);
+  }
+  function fmt(sec) {
+    var s2 = Math.ceil(sec - 0.001);
+    return Math.floor(s2 / 60) + ':' + String(s2 % 60).padStart(2, '0');
+  }
+  var timerEls = null;
+  function timerAct(body) {
+    if (navigator.vibrate) try { navigator.vibrate(12); } catch (e) { /* 不支援 */ }
+    return api('/api/remote/timer', body).catch(function (e) { if (e.message) toast(e.message, true); });
+  }
+  function timerCard() {
+    var num = h('div', { class: 'tnum', 'aria-live': 'off' });
+    var st = h('div', { class: 'tstate' });
+    var go = h('button', { class: 'tgo', onclick: function () { timerAct({ action: 'toggle' }); } });
+    timerEls = { num: num, st: st, go: go };
+    tick();
+    return h('div', { class: 'timer' },
+      h('div', { class: 'thead' }, h('span', { class: 'lab', text: '倒數計時' }), st),
+      num, go,
+      h('div', { class: 'trow' },
+        h('button', { text: '重置', onclick: function () { timerAct({ action: 'reset' }); } }),
+        [30, 45, 60].map(function (sec) {
+          return h('button', { class: (S.show.timer && S.show.timer.duration === sec) ? 'on' : '', text: sec + ' 秒', onclick: function () { timerAct({ action: 'set', seconds: sec }); } });
+        })));
+  }
+  // 每 0.2 秒只更新數字，不重畫整個畫面
+  function tick() {
+    if (!timerEls || !S || !document.body.contains(timerEls.num)) return;
+    var t = S.show.timer || {}, left = timerLeft(), running = !!t.endsAt && left > 0;
+    var warn = (S.layouts && S.layouts.battle && S.layouts.battle.timer && S.layouts.battle.timer.warn) || 10;
+    timerEls.num.textContent = fmt(left);
+    timerEls.num.className = 'tnum' + (running && left <= warn ? ' warn' : '') + (left <= 0 ? ' over' : '');
+    timerEls.st.textContent = left <= 0 ? '時間到' : running ? '倒數中' : (left < (t.duration || 0) ? '暫停中' : '待命');
+    timerEls.go.textContent = running ? '暫停' : (left <= 0 ? '重新開始' : '開始');
+    timerEls.go.className = 'tgo' + (running ? ' pause' : '');
+  }
+  setInterval(tick, 200);
+
+  function timerOnlyView(main) {
+    var c = (S.cues || []).find(function (x) { return x.id === S.show.cueId; });
+    var info = '尚未開始播出';
+    if (c) {
+      info = FDM.cueTitle(S, c);
+      if (c.type === 'battle' && S.results.battles[c.battle]) info += '　第 ' + (S.results.battles[c.battle].round || 1) + ' / ' + (c.rounds || 1) + ' 回合';
+    }
+    var custom = h('input', { type: 'number', inputmode: 'numeric', min: 1, max: 3600, placeholder: '秒數', 'aria-label': '自訂秒數' });
+    add(main, [
+      h('div', { class: 'tinfo' }, h('span', { class: 'lab', text: '播出中' }), h('b', { text: info })),
+      timerCard(),
+      h('form', { class: 'tcustom', onsubmit: function (e) {
+        e.preventDefault();
+        var v = Number(custom.value);
+        if (!Number.isInteger(v) || v < 1 || v > 3600) { toast('請輸入 1–3600 的整數秒數', true); return; }
+        timerAct({ action: 'set', seconds: v }).then(function () { custom.value = ''; custom.blur(); });
+      } }, custom, h('button', { type: 'submit', text: '設定秒數' })),
+      h('div', { class: 'note', text: role === 'timer' ? '這組密碼只能控制 Timer。' : 'Timer 專用畫面。比分、四強請開完整遙控網頁。' })
+    ]);
   }
 
   function top4View(main) {
@@ -211,5 +291,6 @@
   }
 
   if (!token) loginView('');
-  else api('/api/remote/me').then(start).catch(function (e) { if (e.message) loginView(e.message); });
+  else api('/api/remote/me').then(function (j) { role = j.role || 'full'; save('fd-remote-role', role); start(); })
+    .catch(function (e) { if (e.message) loginView(e.message); });
 })();

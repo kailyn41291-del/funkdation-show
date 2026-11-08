@@ -1560,36 +1560,49 @@
     function load() {
       fetch('/api/remote/config').then(function (r) { return r.json(); }).then(function (c) {
         var pw = h('input', { type: 'text', value: c.password || '', placeholder: '至少 4 個字', maxlength: 32, autocomplete: 'off', style: 'width:180px' });
+        var tpw = h('input', { type: 'text', value: c.timerPassword || '', placeholder: '選填，留空＝不開放', maxlength: 32, autocomplete: 'off', style: 'width:180px' });
         var en = h('input', { type: 'checkbox', checked: c.enabled });
         function saveCfg(msg) {
-          post({ enabled: en.checked, password: pw.value }).then(function () { toast(msg); load(); })
+          return post({ enabled: en.checked, password: pw.value, timerPassword: tpw.value }).then(function () { toast(msg); load(); })
             .catch(function (e) { toast(e.message, true); if (en.checked && pw.value.trim().length < 4) { en.checked = false; } });
         }
         en.addEventListener('change', function () {
           if (en.checked && pw.value.trim().length < 4) { toast('請先設定至少 4 個字的密碼', true); en.checked = false; pw.focus(); return; }
           saveCfg(en.checked ? '已開啟遙控網頁' : '已關閉遙控網頁，所有手機都已登出');
         });
+        function qrItem(svg, url, cap) {
+          var q = h('div', { class: 'qr' }); q.innerHTML = svg;
+          return h('div', { class: 'qritem' }, h('b', { class: 'qcap', text: cap }), q, h('code', { text: url }));
+        }
         box.innerHTML = '';
         add(box, [
           h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:700;cursor:pointer' }, en, '開啟遙控網頁'),
-          h('div', { class: 'btnrow', style: 'align-items:center;margin-top:10px' },
-            h('span', { class: 'muted', text: '密碼' }), pw,
-            h('button', { text: '儲存密碼', onclick: function () {
+          h('div', { class: 'pwgrid' },
+            h('span', { class: 'muted', text: '完整遙控密碼' }), pw,
+            h('button', { text: '儲存', onclick: function () {
               if (pw.value.trim().length < 4) { toast('密碼至少 4 個字', true); return; }
               saveCfg('已更新密碼，已登入的手機需要重新輸入');
-            } })),
+            } }),
+            h('span', { class: 'faint', text: '比分、四強、Timer' }),
+            h('span', { class: 'muted', text: 'Timer 專用密碼' }), tpw,
+            h('button', { text: '儲存', onclick: function () {
+              var v = tpw.value.trim();
+              if (v && v.length < 4) { toast('Timer 專用密碼至少 4 個字（不需要就留空）', true); return; }
+              saveCfg(v ? '已更新 Timer 專用密碼' : '已關閉 Timer 專用密碼');
+            } }),
+            h('span', { class: 'faint', text: '只能控制 Timer（給計時人員）' })),
           c.enabled ? [
             c.urls.length ? h('div', { class: 'qrs' }, c.urls.map(function (u) {
-              var q = h('div', { class: 'qr' }); q.innerHTML = u.qr;
-              return h('div', { class: 'qritem' }, q, h('code', { text: u.url }));
+              return [qrItem(u.qr, u.url, '完整遙控'), qrItem(u.timerQr, u.timerUrl, 'Timer 專用')];
             })) : h('div', { class: 'err', text: '這台電腦目前沒有連上任何網路，手機無法連線。請先連上 Wi-Fi（不需要網際網路，現場的路由器或手機熱點都可以）。' }),
             h('div', { class: 'btnrow', style: 'align-items:center' },
-              h('span', { class: 'muted', text: '已登入的裝置：' + c.devices + ' 台' }),
+              h('span', { class: 'muted', text: '已登入的裝置：' + c.devices + ' 台' + (c.timerDevices ? '（其中 Timer 專用 ' + c.timerDevices + ' 台）' : '') }),
               h('button', { class: 'small', text: '登出所有裝置', onclick: function () { post({ logoutAll: true }).then(function () { toast('所有手機都已登出'); load(); }).catch(fail); } }),
               h('button', { class: 'small', text: '重新整理', onclick: load }))
           ] : null,
           h('div', { class: 'hint', html: '手機連上<b>和這台電腦同一個 Wi-Fi</b>，掃 QR Code 或輸入網址，再輸入密碼即可使用。' +
-            '<br>遙控網頁只能加減比分、選四強；其他操作（回合、印章、Timer、播放）仍在控制台。換密碼或關閉後，所有手機都要重新登入。' +
+            '<br><b>完整遙控</b>：加減比分、選四強、控制 Timer。<b>Timer 專用</b>：只有倒數計時（開始／暫停、重置、秒數），用 Timer 專用密碼登入的人改不了比分。' +
+            '<br>回合、印章、晉級與播放仍在控制台。換完整遙控密碼或關閉後，所有手機都要重新登入。' +
             '<br>Windows 第一次開啟時若跳出防火牆詢問，請允許「私人網路」，否則手機連不上。' })]);
       }).catch(function () { box.replaceChildren(h('div', { class: 'faint', text: '無法讀取遙控設定' })); });
     }
@@ -1615,7 +1628,7 @@
           h('li', { text: '勾選「透過 OBS 控制音訊」可以在 OBS 混音；要透明疊加時把底圖模式設為「透明」' })),
         h('div', { class: 'hint', text: '尺寸沒設對時，OBS 畫面左上角會出現黃色提醒，改好就會自動消失。' }),
         h('div', { id: 'lan', class: 'hint' })),
-      h('h3', { text: '遙控網頁（手機加減分、選四強）' }), remoteBox(),
+      h('h3', { text: '遙控網頁（手機加減分、選四強、Timer）' }), remoteBox(),
       h('h3', { text: '備份與還原' }),
       h('div', { class: 'hint', text: '每次修改都會立即存檔，另外每 5 分鐘自動備份一份（保留最近 20 份）。' }),
       h('div', { class: 'btnrow' },
