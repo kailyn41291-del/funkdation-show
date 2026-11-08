@@ -1356,9 +1356,12 @@
           h('div', { class: 'hint', text: '左右兩邊一起調、保持對稱。「左右位置」是離畫面中心的距離：數字越大越靠外側。' })],
       h('h3', { text: '名字' }),
       fld('顯示', chk('顯示出賽名字／字卡（關掉就只有稱號）', rp.concat('showNames'))),
-      sl(v.concat('nch'), '字卡高度', 30, 300),
-      sl(v.concat('ns'), '名字字級（沒有字卡時）', 16, 160), sl(v.concat('rng'), photoMode ? '名字與隊名間距' : '名字與稱號間距', 0, 200),
-      photoMode ? null : sl(v.concat('rw'), '名字最大寬度', 60, 600),
+      fld('名字位置', selPath(rp.concat('namePos'), [['outer', '稱號旁邊・外側（直式）'], ['inner', '稱號旁邊・內側靠比分（直式）'], ['left', '稱號旁邊・都在左邊（直式）'], ['right', '稱號旁邊・都在右邊（直式）'], ['below', '下方（橫式）']], function () { renderInspector(); })),
+      (rt.namePos || 'below') !== 'below' ? [sl(v.concat('nbh'), '直式字卡高度', 60, 800), sl(v.concat('nbg'), '和稱號的距離', -100, 200), sl(v.concat('nby'), '上下微調', -300, 300)]
+        : [sl(v.concat('nch'), '字卡高度', 30, 300)],
+      sl(v.concat('ns'), '名字字級（沒有字卡時）', 16, 160),
+      (rt.namePos || 'below') === 'below' ? [sl(v.concat('rng'), photoMode ? '名字與隊名間距' : '名字與稱號間距', 0, 200),
+        photoMode ? null : sl(v.concat('rw'), '名字最大寬度', 60, 600)] : null,
       fld('名字字型', selPath(rp.concat('nameFont'), [['brush', '跟稱號文字同一個書法字型'], ['title', '跟隊名一樣']].concat(BRUSH_FONTS, [['Noto Serif TC', '思源宋體 Noto Serif TC'], ['Cinzel', 'Cinzel（英文）']],
         (S.event.fonts || []).map(function (f) { return [f.name, f.name + '（上傳）']; })), function () { renderInspector(); }), '可以到「素材與字型」上傳自己的字型'),
       fld('名字顏色', (function () {

@@ -74,6 +74,7 @@ body.monitor #offline { display: none !important; }
 /* 回合稱號（書法）與舞者名字 */
 .rtitle { line-height: 1; letter-spacing: .04em; padding-left: .04em; white-space: nowrap; }
 .rv .rtitle { writing-mode: vertical-rl; text-orientation: upright; padding-left: 0; padding-top: .04em; }
+.rv .rname { writing-mode: vertical-rl; text-orientation: upright; padding-left: 0; padding-top: .06em; }
 .rimgw { line-height: 0; }
 .rimg { display: block; }
 .rname { line-height: 1; letter-spacing: .06em; padding-left: .06em; white-space: nowrap; }

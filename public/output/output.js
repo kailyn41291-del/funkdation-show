@@ -876,7 +876,7 @@
             var nw = o.iT.naturalWidth || 1, nh = o.iT.naturalHeight || 1, k = Math.min(geo.maxH / nh, geo.maxW / nw); // 側邊模式只看高度（「大小」滑桿）
             px(o.iT, { width: nw * k, height: nh * k });
             px(o.iW, { left: cx, top: geo.cy - nh * k / 2 });
-            done(nh * k);
+            done(nh * k, nw * k);
           };
           if (o.iT.complete && o.iT.naturalWidth) fit(); else o.iT.onload = fit;
           return;
@@ -893,10 +893,40 @@
         if (kk < 1) px(o.tW, { fontSize: size0 * kk });
         var hh = o.tT.offsetHeight;
         px(o.tW, { top: geo.cy - hh / 2 });
-        done(hh);
+        done(hh, o.tT.offsetWidth);
+      }
+      // 名字放在稱號旁邊（直式字卡／直式文字）：outer＝外側、inner＝內側（靠比分）、left／right＝兩隊都放左邊／右邊
+      function namesBeside(pos) {
+        var nb = v.nbh || 260, ng2 = v.nbg == null ? 16 : v.nbg, ny = v.nby || 0, ns = v.ns || 52;
+        [[nmL, geo.cl, info.lCard, rtA, 0], [nmR, geo.cr, info.rCard, rtB, 1]].forEach(function (o) {
+          var idx = o[4], sign = pos === 'right' ? 1 : pos === 'left' ? -1 : pos === 'inner' ? (idx ? -1 : 1) : (idx ? 1 : -1);
+          var tw = widths[idx] || 0, card = o[2] ? asset(o[2]) : '', box = o[3], nm = o[0];
+          nm.wrap.style.display = card ? 'none' : '';
+          box.cW.style.display = card ? '' : 'none';
+          if (!card) {
+            nm.wrap.classList.add('rv');
+            px(nm.wrap, { fontSize: ns });
+            var lim = nb, hh = nm.t.offsetHeight || 1;
+            if (hh > lim) px(nm.wrap, { fontSize: ns * lim / hh });
+            var w2 = nm.t.offsetWidth, h2 = nm.t.offsetHeight;
+            px(nm.wrap, { left: o[1] + sign * (tw / 2 + ng2 + w2 / 2), top: geo.cy - h2 / 2 + ny });
+            return;
+          }
+          if (box.cT.getAttribute('src') !== card) box.cT.src = card;
+          var fitC = function () {
+            if (gen !== rtGen) return;
+            var nw = box.cT.naturalWidth || 1, nh = box.cT.naturalHeight || 1, k = nb / nh;
+            px(box.cT, { width: nw * k, height: nh * k });
+            px(box.cW, { left: o[1] + sign * (tw / 2 + ng2 + nw * k / 2), top: geo.cy - nh * k / 2 + ny });
+          };
+          if (box.cT.complete && box.cT.naturalWidth) fitC(); else box.cT.onload = fitC;
+        });
       }
       function names() {
         if (heights.length < 2 || heights[0] == null || heights[1] == null) return;
+        var pos = rt.namePos || 'below';
+        if (pos !== 'below') { namesBeside(pos); return; }
+        nmL.wrap.classList.remove('rv'); nmR.wrap.classList.remove('rv');
         var ns = v.ns || 52, y, maxW;
         if (photoMode) {
           // 隊名（和第二行）下方
@@ -928,8 +958,9 @@
           if (box.cT.complete && box.cT.naturalWidth) fitC(); else box.cT.onload = fitC;
         });
       }
-      place(rtA, geo.cl, function (hh) { heights[0] = hh; names(); });
-      place(rtB, geo.cr, function (hh) { heights[1] = hh; names(); });
+      var widths = [];
+      place(rtA, geo.cl, function (hh, ww) { heights[0] = hh; widths[0] = ww; names(); });
+      place(rtB, geo.cr, function (hh, ww) { heights[1] = hh; widths[1] = ww; names(); });
     }
 
     function B() { return S.results.battles[sc.ctx.cue.battle] || { l: 0, r: 0, round: 1, seal: null }; }

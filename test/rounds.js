@@ -44,7 +44,7 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   check('預設用內建書法 PNG', s.layouts.battle.rt.images.length === 5 && s.layouts.battle.rt.images[0] === 'builtin/round-1.png');
   check('內建 PNG 可以讀到', (await fetch(BASE + '/builtin/round-5.png')).status === 200);
 
-  await ops([{ op: 'set', path: ['layouts', 'battle', 'rt', 'mode'], value: 'side' }, { op: 'set', path: ['results', 'top4'], value: ['t1', 't7', 't2', 't4'] }, { op: 'set', path: ['show', 'cueId'], value: 'c-semi1' }, { op: 'set', path: ['show', 'seq'], value: 2 },
+  await ops([{ op: 'set', path: ['layouts', 'battle', 'rt', 'namePos'], value: 'below' }, { op: 'set', path: ['layouts', 'battle', 'rt', 'mode'], value: 'side' }, { op: 'set', path: ['results', 'top4'], value: ['t1', 't7', 't2', 't4'] }, { op: 'set', path: ['show', 'cueId'], value: 'c-semi1' }, { op: 'set', path: ['show', 'seq'], value: 2 },
     { op: 'set', path: ['cues', s.cues.findIndex(c => c.id === 'c-semi1'), 'lineup'], value: { l: ['小明'], r: ['阿華'] } }]);
 
   const browser = await chromium.launch({ executablePath: CHROME });

@@ -27,9 +27,10 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
 
   // 產生字卡 PNG（透明背景、四周留白）
   const cardDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fd-cardpng-'));
-  const mk = await browser.newPage({ viewport: { width: 800, height: 300 } });
+  // 直式字卡
+  const mk = await browser.newPage({ viewport: { width: 300, height: 800 } });
   for (const name of ['小明', 'KENJI']) {
-    await mk.setContent(`<body style="margin:0;background:transparent"><div style="width:800px;height:300px;display:flex;align-items:center;justify-content:center"><span style="font:900 120px serif;color:#fff;background:#123;padding:0 20px">${name}</span></div></body>`);
+    await mk.setContent(`<body style="margin:0;background:transparent"><div style="width:300px;height:800px;display:flex;align-items:center;justify-content:center"><span style="font:900 110px serif;color:#111;writing-mode:vertical-rl;text-orientation:upright;padding:20px 0">${name}</span></div></body>`);
     fs.writeFileSync(path.join(cardDir, name + '.png'), await mk.screenshot({ omitBackground: true }));
   }
   await mk.close();
@@ -85,15 +86,27 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
     const vis = el => el && getComputedStyle(el.parentNode).display !== 'none' && +getComputedStyle(el).opacity > 0.5;
     const cards = [...sc.querySelectorAll('.rcard')], names = [...sc.querySelectorAll('.rname')];
     return [0, 1].map(i => {
-      if (vis(cards[i]) && cards[i].getAttribute('src')) { const r = cards[i].getBoundingClientRect(); return 'card:' + cards[i].getAttribute('src').split('/').pop() + '@' + Math.round(r.left + r.width / 2) + 'h' + Math.round(r.height); }
+      if (vis(cards[i]) && cards[i].getAttribute('src')) { const r = cards[i].getBoundingClientRect(); return 'card:' + cards[i].getAttribute('src').split('/').pop() + '@' + Math.round(r.left + r.width / 2) + 'h' + Math.round(r.height) + 'r' + Math.round(r.right); }
       return vis(names[i]) && names[i].textContent ? 'txt:' + names[i].textContent : '';
     });
   });
   let r = await read();
   const trimName = ms[0].card.trim.split('/').pop();
-  check('左方顯示小明的字卡（裁邊版、高度 90、在左隊中央）', r[0] === 'card:' + trimName + '@500h90', r[0]);
+  const tb = await out.evaluate(() => { const r = document.querySelector('.scene:last-child .rimg:not(.rcard)').getBoundingClientRect(); return { l: r.left, cy: r.top + r.height / 2 }; });
+  const cb = await out.evaluate(() => { const r = document.querySelector('.scene:last-child .rcard').getBoundingClientRect(); return { r: r.right, cy: r.top + r.height / 2, h: r.height }; });
+  check('左方顯示小明的直式字卡：在稱號外側（左邊）、高度 260、和稱號垂直置中', r[0].startsWith('card:' + trimName) && Math.abs(cb.h - 260) < 2 && Math.abs(tb.l - 16 - cb.r) < 3 && Math.abs(cb.cy - tb.cy) < 3, r[0] + ' ' + JSON.stringify([tb, cb]));
   check('右方沒有字卡：顯示打的名字', r[1] === 'txt:阿華', r[1]);
+  const vt = await out.evaluate(() => { const n = document.querySelectorAll('.scene:last-child .rname')[1]; const r = n.getBoundingClientRect(); return getComputedStyle(n).writingMode + ' ' + Math.round(r.left); });
+  check('文字名字也直排、在右隊稱號外側（右邊）', vt.startsWith('vertical-rl') && +vt.split(' ')[1] > 1420 + 50, vt);
   await out.screenshot({ path: path.join(SHOTS, 'cards-r1.png') });
+  // 改成內側
+  await ops([{ op: 'set', path: ['layouts', 'battle', 'rt', 'namePos'], value: 'inner' }]);
+  await sleep(1000);
+  const cb2 = await out.evaluate(() => { const r = document.querySelector('.scene:last-child .rcard').getBoundingClientRect(); return r.left; });
+  check('改成內側：字卡在左隊稱號右邊', cb2 > 500, String(Math.round(cb2)));
+  await out.screenshot({ path: path.join(SHOTS, 'cards-inner.png') });
+  await ops([{ op: 'set', path: ['layouts', 'battle', 'rt', 'namePos'], value: 'outer' }]);
+  await sleep(800);
 
   await out.evaluate(() => window.fd.cmd([{ op: 'set', path: ['results', 'battles', 'semi1', 'round'], value: 2 }], { name: 'round', battle: 'semi1', round: 2 }));
   await sleep(1800);
