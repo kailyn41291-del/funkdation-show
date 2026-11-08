@@ -27,15 +27,14 @@ const guestTeam = ([id, en, src]) => ({
 const exhibitionCue = () => ({
   id: 'c-exhib', type: 'battle', battle: 'exhibition', name: '表演賽',
   left: { source: 'team', team: 'g1' }, right: { source: 'team', team: 'g2' },
-  title: 'EXHIBITION', zh: '表演賽', rounds: 4, seconds: 60, own: false
+  title: 'EXHIBITION', zh: '表演賽', rounds: 3, seconds: 60, own: false, noTitles: true
 });
 
 const step = (fx) => ({ fx, dur: 0, extra: 0 });
 const bg = () => ({ mode: 'color', color: '#8b2420', src: null, sound: false, texture: true });
 
 function emptyBattle() {
-  // names：每回合上場的舞者名字（l／r 各一個陣列，第 n 回合在 [n-1]），沒填就只顯示回合稱號
-  return { l: 0, r: 0, round: 1, seal: null, winner: null, hist: [], names: { l: [], r: [] } };
+  return { l: 0, r: 0, round: 1, seal: null, winner: null, hist: [] };
 }
 
 function personLayout(text) {
@@ -91,10 +90,10 @@ function defaultLayouts() {
         ty: 700, ts: 64,
         es: 46, zs: 26, ng: 30,
         gs: 150, gx: -20, gy: -50, ga: -6,
-        rx: 810, ry: 440, rs: 150, rh: 400, rw: 270, ns: 52, ng: 28
+        rx: 810, ry: 440, rs: 150, rh: 400, rw: 270, ns: 52, rng: 28, rp: 100
       },
       // 回合稱號：依回合顯示（書法字），有填舞者名字時在兩隊下方顯示名字
-      rt: { on: true, titles: ['先鋒', '策應', '中樞', '副將', '主將'], images: ['builtin/round-1.png', 'builtin/round-2.png', 'builtin/round-3.png', 'builtin/round-4.png', 'builtin/round-5.png'], dir: 'v', font: 'FD Potta One', color: 'ink', nameFont: 'brush' },
+      rt: { on: true, titles: ['先鋒', '策應', '中樞', '副將', '主將'], images: ['builtin/round-1.png', 'builtin/round-2.png', 'builtin/round-3.png', 'builtin/round-4.png', 'builtin/round-5.png'], mode: 'photo', dir: 'v', font: 'FD Potta One', color: 'ink', nameFont: 'brush' },
       divider: true,
       anim: { duration: 500, overlap: 60, stagger: 300, steps: { fr: step('fade'), ph: step('ink'), nm: step('brush'), info: step('fade'), rt: step('ink') } },
       scoreFx: 'fade',
@@ -162,7 +161,7 @@ function defaultCues() {
 
 function defaultState() {
   return {
-    schema: 6,
+    schema: 7,
     event: {
       title: 'FUNKDATION VOL.4',
       fonts: [],

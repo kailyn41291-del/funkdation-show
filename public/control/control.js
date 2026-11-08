@@ -989,7 +989,7 @@
     mc: [['basic', '基本'], ['text', '文字'], ['photo', '照片'], ['layout', '版面'], ['anim', '動畫']],
     dj: [['basic', '基本'], ['text', '文字'], ['photo', '照片'], ['layout', '版面'], ['anim', '動畫']],
     top4: [['basic', '基本'], ['layout', '版面'], ['anim', '動畫']],
-    battle: [['basic', '基本'], ['lineup', '名單'], ['rtitle', '回合稱號'], ['photo', '照片'], ['layout', '版面'], ['anim', '動畫'], ['seal', '印章與計時']],
+    battle: [['basic', '基本'], ['rtitle', '回合稱號'], ['photo', '照片'], ['layout', '版面'], ['anim', '動畫'], ['seal', '印章與計時']],
     champ: [['basic', '基本'], ['text', '內容'], ['layout', '版面'], ['anim', '動畫']],
     idle: [['basic', '基本']], overview: [['basic', '基本'], ['text', '標題'], ['layout', '版面'], ['anim', '動畫']], black: [['basic', '基本']]
   };
@@ -1015,7 +1015,7 @@
       mc: { basic: judgeBasic, text: judgeText, photo: judgePhoto, layout: judgeLayout, anim: judgeAnim },
       dj: { basic: judgeBasic, text: judgeText, photo: judgePhoto, layout: judgeLayout, anim: judgeAnim },
       top4: { basic: top4Basic, layout: top4Layout, anim: top4Anim },
-      battle: { basic: battleBasic, lineup: function (pane, c) { lineupEditor(pane, c, false); }, rtitle: battleRoundTitle, photo: battlePhoto, layout: battleLayout, anim: battleAnim, seal: battleSeal },
+      battle: { basic: battleBasic, rtitle: battleRoundTitle, photo: battlePhoto, layout: battleLayout, anim: battleAnim, seal: battleSeal },
       champ: { basic: champBasic, text: champText, layout: champLayout, anim: champAnim },
       idle: { basic: idleBasic }, overview: { basic: overviewBasic, text: overviewText, layout: overviewLayout, anim: overviewAnim }, black: { basic: blackBasic }
     };
@@ -1226,8 +1226,8 @@
         var m = { semi1: ['SEMI FINAL', '四強賽', 5, { source: 'top4', index: 0 }, { source: 'top4', index: 1 }, '四強對戰 1'],
           semi2: ['SEMI FINAL', '四強賽', 5, { source: 'top4', index: 2 }, { source: 'top4', index: 3 }, '四強對戰 2'],
           final: ['FINAL', '決賽', 5, { source: 'winner', battle: 'semi1' }, { source: 'winner', battle: 'semi2' }, '決賽'],
-          exhibition: ['EXHIBITION', '表演賽', 4, { source: 'team', team: gs[0] ? gs[0].id : null }, { source: 'team', team: gs[1] ? gs[1].id : null }, '表演賽'] }[v];
-        var n = Object.assign(clone(c), { battle: v, title: m[0], zh: m[1], rounds: m[2], left: m[3], right: m[4], name: m[5] });
+          exhibition: ['EXHIBITION', '表演賽', 3, { source: 'team', team: gs[0] ? gs[0].id : null }, { source: 'team', team: gs[1] ? gs[1].id : null }, '表演賽'] }[v];
+        var n = Object.assign(clone(c), { battle: v, title: m[0], zh: m[1], rounds: m[2], left: m[3], right: m[4], name: m[5], noTitles: v === 'exhibition' });
         setPath(cp, n); renderCueList(); renderInspector();
       }), '比分與印章依場次記錄'),
       fld('左方隊伍', sourceSelect(c.left, function (o) { setPath(cp.concat('left'), o); renderCueList(); })),
@@ -1245,6 +1245,13 @@
         i.addEventListener('change', function () { var v = Number(i.value); if (!Number.isInteger(v) || v < 1) { toast('秒數請輸入大於 0 的整數', true); i.value = c.seconds; return; } setPath(cp.concat('seconds'), v); });
         return i;
       })(), '播到這個 Cue 時 Timer 會重設成這個秒數'),
+      fld('回合稱號', (function () {
+        var i = h('input', { type: 'checkbox' });
+        i.checked = !c.noTitles;
+        i.addEventListener('change', function () { setPath(cp.concat('noTitles'), !i.checked); renderInspector(); });
+        return h('label', { style: 'display:inline-flex;gap:6px;align-items:center;cursor:pointer;color:var(--text)' }, i, '這場顯示回合稱號（先鋒、策應…）');
+      })(), '表演賽預設不顯示；稱號樣式在「回合稱號」分頁'),
+      (function () { var d = h('div'); lineupEditor(d, c, false); return d; })(),
       h('h3', { text: '版型' }),
       fld('獨立版型', chk('這個 Cue 使用獨立的版面與動畫（例如讓決賽更隆重）', cp.concat('own'), function (on) {
         if (on && !S.layouts['battle@' + c.id]) setPath(['layouts', 'battle@' + c.id], clone(S.layouts.battle));
@@ -1259,18 +1266,22 @@
   }
   // ---------- 出賽名單：每回合兩隊上場的舞者（選填）；有填就和回合稱號一起顯示名字，沒填只顯示稱號 ----------
   function lineupEditor(pane, c, live) {
-    var bp = ['results', 'battles', c.battle], b = getAt(S, bp) || {}, nm = b.names || {};
+    if (c.noTitles) {
+      if (!live) add(pane, h('div', { class: 'hint', text: '這場不顯示回合稱號，所以也不顯示名單。要顯示請到「基本」勾選「這場顯示回合稱號」。' }));
+      return;
+    }
+    var ci = S.cues.indexOf(c), lp0 = ['cues', ci, 'lineup'], b = getAt(S, ['results', 'battles', c.battle]) || {}, nm = c.lineup || {};
     var rt = (S.layouts.battle && S.layouts.battle.rt) || {}, titles = rt.titles || [];
     var tL = FDM.resolve(S, c.left), tR = FDM.resolve(S, c.right), n = Math.max(1, c.rounds || 5);
     function input(side, i) {
       var v = ((nm[side] || [])[i]) || '';
       var el = h('input', { type: 'text', value: v, placeholder: '（不填）', maxlength: 40, 'data-keep': c.battle + side + i, 'aria-label': (side === 'l' ? '左方' : '右方') + '第 ' + (i + 1) + ' 回合舞者' });
       el.addEventListener('input', function () {
-        var cur = getAt(S, bp.concat('names')) || {};
+        var cur = getAt(S, lp0) || {};
         var arr = (cur[side] || []).slice();
         while (arr.length < n) arr.push('');
         arr[i] = el.value;
-        setPath(bp.concat(['names', side]), arr);
+        setPath(lp0.concat(side), arr);
       });
       return el;
     }
@@ -1283,9 +1294,9 @@
     }
     add(pane, [h('h3', { text: '出賽名單（選填）' }),
       h('div', { class: 'lineup' },
-        h('div', { class: 'lrow lhead' }, h('div'), h('div', { text: '左方　' + (tL ? tL.en : '（未決定）') }), h('div', { text: '右方　' + (tR ? tR.en : '（未決定）') })),
+        h('div', { class: 'lrow lhead' }, h('div'), h('div', { text: '左方　' + (tL && !tL._ph ? tL.en : FDM.sourceLabel(c.left) + '（未決定）') }), h('div', { text: '右方　' + (tR && !tR._ph ? tR.en : FDM.sourceLabel(c.right) + '（未決定）') })),
         rows),
-      h('div', { class: 'hint', text: '有填名字：輸出畫面在回合稱號兩側、各隊下方顯示這回合的舞者；沒填就只顯示回合稱號。打字會即時更新，也可以比賽前先在編排填好。' })]);
+      h('div', { class: 'hint', text: live ? '演出中也可以臨時修改，輸出畫面即時更新。' : '比賽前先在這裡填好每個稱號上場的舞者（存在這個 Cue，清除比賽結果不會清掉）。有填名字就和稱號一起顯示，沒填只顯示稱號。演出中也可以在演出面板臨時修改。' })]);
   }
   // 回合稱號設定（所有對戰共用）
   var BRUSH_FONTS = [['FD Potta One', '霸氣毛筆（Potta One，預設）'], ['FD Yuji Boku', '傳統書法（Yuji Boku）'], ['FD Reggae One', '粗獷筆刷（Reggae One）']];
@@ -1312,20 +1323,26 @@
           img ? h('button', { class: 'ghost', text: '改回文字', onclick: function () { setArr('images', i, null); renderInspector(); } }) : null));
       })(i);
     }
-    add(pane, [h('h3', { text: '回合稱號' }),
-      fld('顯示', chk('依回合顯示稱號（左右兩隊各一個）', rp.concat('on'))),
+    var photoMode = rt.mode === 'photo';
+    add(pane, [c.noTitles ? h('div', { class: 'hint warnline', text: '這個 Cue 設定為不顯示回合稱號（「基本」分頁可以打開）。下面的設定是所有對戰共用的。' }) : null,
+      h('h3', { text: '回合稱號' }),
+      fld('顯示', chk('依回合顯示稱號', rp.concat('on'))),
+      fld('位置', selPath(rp.concat('mode'), [['photo', '放在照片框裡（取代團隊照片）'], ['side', '照片框外側（保留團隊照片）']], function () { renderInspector(); })),
       h('div', { class: 'rttable' }, rows),
-      h('div', { class: 'hint', text: '有上傳 PNG 的回合用圖片（透明背景），沒有的用下方的書法字。所有對戰共用；四強與決賽各 5 回合。' }),
+      h('div', { class: 'hint', text: '有上傳 PNG 的回合用圖片（透明背景），沒有的用下方的書法字。四強與決賽各 5 回合；表演賽不顯示。' }),
       h('h3', { text: '稱號位置與大小' }),
-      sl(v.concat('rh'), '大小（高度）', 80, 900), sl(v.concat('rx'), '左右位置', 300, 950), sl(v.concat('ry'), '上下位置', 100, 1000),
-      h('div', { class: 'hint', text: '左右兩邊一起調、保持對稱。「左右位置」是離畫面中心的距離：數字越大越靠外側。上方預覽會即時顯示，可以按「登場」看動畫。' }),
+      photoMode ? [sl(v.concat('rp'), '大小（框內 %）', 30, 140),
+        h('div', { class: 'hint', text: '稱號放在兩隊照片框正中央，團隊照片不顯示（外框保留）。位置跟著「版面」分頁的照片位置。名字在隊名下方。' })]
+        : [sl(v.concat('rh'), '大小（高度）', 80, 900), sl(v.concat('rx'), '左右位置', 300, 950), sl(v.concat('ry'), '上下位置', 100, 1000),
+          h('div', { class: 'hint', text: '左右兩邊一起調、保持對稱。「左右位置」是離畫面中心的距離：數字越大越靠外側。' })],
       h('h3', { text: '名字' }),
-      sl(v.concat('ns'), '名字字級', 16, 160), sl(v.concat('ng'), '名字與稱號間距', 0, 200), sl(v.concat('rw'), '名字最大寬度', 60, 600),
+      sl(v.concat('ns'), '名字字級', 16, 160), sl(v.concat('rng'), photoMode ? '名字與隊名間距' : '名字與稱號間距', 0, 200),
+      photoMode ? null : sl(v.concat('rw'), '名字最大寬度', 60, 600),
       fld('名字字型', selPath(rp.concat('nameFont'), [['brush', '跟稱號一樣的書法字'], ['title', '隊名字型']])),
       h('h3', { text: '文字樣式（沒有圖片的回合）' }),
       fld('排列', selPath(rp.concat('dir'), [['v', '直式'], ['h', '橫式']])),
       fld('書法字型', selPath(rp.concat('font'), fonts), '也可以到「素材與字型」上傳自己的書法字型'),
-      sl(v.concat('rs'), '文字字級', 40, 400),
+      photoMode ? null : sl(v.concat('rs'), '文字字級', 40, 400),
       fld('顏色', selPath(rp.concat('color'), [['ink', '墨色（深）'], ['light', '米白（淺）']]), '名字也用這個顏色'),
       h('div', { class: 'hint', text: '動畫在「動畫」分頁的「回合稱號與名字」。' })]);
   }

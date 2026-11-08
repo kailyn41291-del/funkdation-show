@@ -831,17 +831,31 @@
     var ORDER = ['fr', 'ph', 'nm', 'info', 'rt'];
     function brushFont(name) { return "'" + String(name || 'FD Potta One').replace(/'/g, '') + "', var(--fzh)"; }
     function inkOf(c) { return c === 'light' ? 'var(--light)' : c === 'ink' || !c ? 'var(--ink)' : c; }
-    // 依回合放稱號：左右兩隊外側各一個（直式或橫式），名字在稱號正下方
-    var rtGen = 0;
+    // 依回合放稱號。兩種模式：
+    //   side：左右兩隊照片外側各一個，名字在稱號正下方
+    //   photo：直接放在兩隊照片框裡（取代團隊照片），名字在隊名下方
+    var rtGen = 0, rtPhoto = false;
     function roundTexts(round) {
-      var L = sc.ctx.layout, v = L.v, rt = L.rt || {};
-      var info = FDM.roundInfo(S, sc.ctx.cue.battle, round);
-      var on = rt.on !== false, gen = ++rtGen;
+      var L = sc.ctx.layout, v = L.v, rt = L.rt || {}, cue = sc.ctx.cue;
+      var info = FDM.roundInfo(S, cue, round, rt);
+      var on = rt.on !== false && !cue.noTitles, gen = ++rtGen;
+      var photoMode = on && rt.mode === 'photo';
+      // 照片框模式：藏起團隊照片（外框保留）
+      [pL, pR].forEach(function (p) { p.img.style.visibility = photoMode ? 'hidden' : ''; });
+      rtPhoto = photoMode;
       [rtA.tW, rtA.iW, rtB.tW, rtB.iW, nmL.wrap, nmR.wrap].forEach(function (el) { el.style.display = on ? '' : 'none'; });
       if (!on) return;
       var src = info.img ? asset(info.img) : '';
-      var rx = v.rx || 810, ry = v.ry || 440, rs = v.rs || 150, rh = v.rh || 360, rw = v.rw || 260, ng = v.ng == null ? 28 : v.ng;
       var vert = rt.dir !== 'h', col = inkOf(rt.color);
+      var pw = v.pw, ph = Math.round(pw * 2 / 3), xl = W / 2 - v.pd - pw, xr = W / 2 + v.pd;
+      var geo;
+      if (photoMode) {
+        var pad = (v.pad || 0) * pw / 840, k = (v.rp || 88) / 100;
+        geo = { cl: xl + pw / 2, cr: xr + pw / 2, cy: v.pt + ph / 2, maxH: (ph - 2 * pad) * k, maxW: (pw - 2 * pad) * k };
+      } else {
+        geo = { cl: W / 2 - (v.rx || 810), cr: W / 2 + (v.rx || 810), cy: v.ry || 440, maxH: v.rh || 400, maxW: 9999 };
+      }
+      var rs = v.rs || 150, rw = v.rw || 270, gap = v.rng == null ? 28 : v.rng;
       var nf = rt.nameFont === 'title' ? 'var(--fen)' : brushFont(rt.font);
       nmL.t.style.fontFamily = nmR.t.style.fontFamily = nf;
       nmL.t.style.color = nmR.t.style.color = col;
@@ -854,9 +868,9 @@
           if (o.iT.getAttribute('src') !== src) o.iT.src = src;
           var fit = function () {
             if (gen !== rtGen) return;
-            var nw = o.iT.naturalWidth || rh, nh = o.iT.naturalHeight || rh, k = rh / nh; // 圖片大小只看高度（「大小」滑桿）
+            var nw = o.iT.naturalWidth || 1, nh = o.iT.naturalHeight || 1, k = Math.min(geo.maxH / nh, geo.maxW / nw); // 側邊模式只看高度（「大小」滑桿）
             px(o.iT, { width: nw * k, height: nh * k });
-            px(o.iW, { left: cx, top: ry - nh * k / 2 });
+            px(o.iW, { left: cx, top: geo.cy - nh * k / 2 });
             done(nh * k);
           };
           if (o.iT.complete && o.iT.naturalWidth) fit(); else o.iT.onload = fit;
@@ -866,26 +880,36 @@
         o.tT.style.fontFamily = brushFont(rt.font);
         o.tT.style.color = col;
         if (o.tT.textContent !== info.title) o.tT.textContent = info.title;
-        px(o.tW, { left: cx, fontSize: rs });
-        // 太長就縮小：直式限制高度、橫式限制寬度
-        var lim = vert ? rh : rw, size = vert ? o.tT.offsetHeight : o.tT.offsetWidth;
-        if (size > lim) px(o.tW, { fontSize: rs * lim / size });
+        // 照片框模式：字級自動放到框的大小；側邊模式用「文字字級」
+        var size0 = photoMode ? geo.maxH / 2.1 : rs;
+        px(o.tW, { left: cx, fontSize: size0 });
+        var limH = vert ? geo.maxH : 9999, limW = vert ? geo.maxW : Math.min(geo.maxW, rw);
+        var kk = Math.min(1, limH / (o.tT.offsetHeight || 1), limW / (o.tT.offsetWidth || 1));
+        if (kk < 1) px(o.tW, { fontSize: size0 * kk });
         var hh = o.tT.offsetHeight;
-        px(o.tW, { top: ry - hh / 2 });
+        px(o.tW, { top: geo.cy - hh / 2 });
         done(hh);
       }
       function names() {
-        if (heights.length < 2) return;
-        var y = ry + Math.max(heights[0], heights[1]) / 2 + ng;
+        if (heights.length < 2 || heights[0] == null || heights[1] == null) return;
+        var ns = v.ns || 52, y, maxW;
+        if (photoMode) {
+          // 隊名（和第二行）下方
+          var zb = Math.max(zhL.wrap.offsetTop + zhL.wrap.offsetHeight, enL.wrap.offsetTop + enL.wrap.offsetHeight);
+          y = (zhL.t.textContent || zhR.t.textContent ? zb : enL.wrap.offsetTop + enL.wrap.offsetHeight) + gap;
+          maxW = pw;
+        } else {
+          y = geo.cy + Math.max(heights[0], heights[1]) / 2 + gap;
+          maxW = rw;
+        }
         // 各自縮放（長名字只縮自己），中心對齊同一條線
-        var ns = v.ns || 52;
-        [[nmL, W / 2 - rx], [nmR, W / 2 + rx]].forEach(function (o) {
-          var got = o[0].at(o[1], y, ns, rw);
+        [[nmL, geo.cl], [nmR, geo.cr]].forEach(function (o) {
+          var got = o[0].at(o[1], y, ns, maxW);
           px(o[0].wrap, { top: y + (ns - got) / 2 });
         });
       }
-      place(rtA, W / 2 - rx, function (hh) { heights[0] = hh; names(); });
-      place(rtB, W / 2 + rx, function (hh) { heights[1] = hh; names(); });
+      place(rtA, geo.cl, function (hh) { heights[0] = hh; names(); });
+      place(rtB, geo.cr, function (hh) { heights[1] = hh; names(); });
     }
 
     function B() { return S.results.battles[sc.ctx.cue.battle] || { l: 0, r: 0, round: 1, seal: null }; }
@@ -1358,7 +1382,7 @@
       if (im.decode) im.decode().catch(function () {});
       preloaded['rt:' + src] = im;
     });
-    for (var bk in S.results.battles) { var nb = S.results.battles[bk].names || {}; brush = brush.concat(nb.l || [], nb.r || []); }
+    S.cues.forEach(function (c) { var nb = c.lineup || {}; brush = brush.concat(nb.l || [], nb.r || []); });
     var brushAll = brush.filter(Boolean).join(' ');
     var all = texts.filter(Boolean).join(' ') + ' ' + brushAll;
     sig = all + '|' + ev.fontEn + '|' + ev.fontZh + '|' + (rtL && rtL.font);

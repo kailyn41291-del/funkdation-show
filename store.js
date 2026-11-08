@@ -27,7 +27,28 @@ function migrate(state) {
   if ((state.schema || 0) < 4) migrate4(state);
   if ((state.schema || 0) < 5) migrate5(state);
   if ((state.schema || 0) < 6) migrate6(state);
+  if ((state.schema || 0) < 7) migrate7(state);
   return state;
+}
+// schema 7：表演賽 3 回合、不顯示回合稱號
+function migrate7(state) {
+  // 出賽名單存在對戰 Cue 上（cue.lineup），清除比賽結果時不會被清掉
+  const bt = (state.results && state.results.battles) || {};
+  for (const c of state.cues || []) {
+    if (c.type !== 'battle') continue;
+    const old = bt[c.battle] && bt[c.battle].names;
+    if (!c.lineup) c.lineup = old ? { l: (old.l || []).slice(), r: (old.r || []).slice() } : { l: [], r: [] };
+  }
+  for (const k in bt) delete bt[k].names;
+  for (const c of state.cues || []) {
+    if (c.type === 'battle' && c.battle === 'exhibition') {
+      if (c.rounds === 4) c.rounds = 3;
+      if (c.noTitles === undefined) c.noTitles = true;
+      const b = state.results && state.results.battles && state.results.battles.exhibition;
+      if (b && b.round > c.rounds) b.round = c.rounds;
+    }
+  }
+  state.schema = 7;
 }
 // schema 6：四強改成 5 回合（先鋒、策應、中樞、副將、主將）
 function migrate6(state) {

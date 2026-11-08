@@ -57,10 +57,14 @@
   function judgeById(state, id) { return personById(state, 'judge', id); }
 
   // 回合稱號（先鋒、策應…）與這回合兩隊上場的舞者名字
-  function roundInfo(state, battleId, round) {
-    var L = state && state.layouts && state.layouts.battle, rt = (L && L.rt) || {};
+  // rtOverride：Cue 用獨立版型時傳那個版型的 rt
+  // cueOrBattle：對戰 Cue（出賽名單在 cue.lineup）或場次 id
+  function roundInfo(state, cueOrBattle, round, rtOverride) {
+    var L = state && state.layouts && state.layouts.battle, rt = rtOverride || (L && L.rt) || {};
+    var cue = typeof cueOrBattle === 'object' ? cueOrBattle : (state.cues || []).filter(function (c) { return c.type === 'battle' && c.battle === cueOrBattle; })[0];
+    var battleId = cue ? cue.battle : cueOrBattle;
     var b = state && state.results && state.results.battles && state.results.battles[battleId];
-    var i = (round || (b && b.round) || 1) - 1, nm = (b && b.names) || {};
+    var i = (round || (b && b.round) || 1) - 1, nm = (cue && cue.lineup) || {};
     return {
       title: rt.on === false ? '' : ((rt.titles || [])[i] || ''),
       img: rt.on === false ? '' : ((rt.images || [])[i] || ''),

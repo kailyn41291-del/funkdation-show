@@ -23,9 +23,11 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fd-rounds-'));
   const old = defaultState();
   old.schema = 5;
-  old.cues.forEach(c => { if (c.battle === 'semi1' || c.battle === 'semi2') c.rounds = 4; });
+  old.cues.forEach(c => { if (c.battle === 'semi1' || c.battle === 'semi2' || c.battle === 'exhibition') c.rounds = 4; delete c.noTitles; });
   delete old.layouts.battle.rt;
   Object.values(old.results.battles).forEach(b => { delete b.names; });
+  old.cues.forEach(c => { delete c.lineup; });
+  old.results.battles.semi1.names = { l: ['舊名單'], r: [] }; // v1.0.23 存在 results，要搬到 Cue 上
   fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify({ rev: 1, state: old }));
   const srv = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], { env: Object.assign({}, process.env, { FD_DATA: dir, FD_PORT: String(PORT) }), stdio: ['ignore', 'pipe', 'inherit'] });
   process.on('exit', () => srv.kill('SIGKILL'));
@@ -33,13 +35,17 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   let s = await state();
   const rounds = s.cues.filter(c => c.type === 'battle').map(c => c.battle + ':' + c.rounds).join(' ');
   check('舊存檔：四強、決賽都是 5 回合', ['semi1', 'semi2', 'final'].every(b => s.cues.find(c => c.battle === b).rounds === 5), rounds);
-  check('表演賽維持原本回合數', s.cues.find(c => c.battle === 'exhibition').rounds === 4, rounds);
+  const ex = s.cues.find(c => c.battle === 'exhibition');
+  check('表演賽改成 3 回合、不顯示稱號', ex.rounds === 3 && ex.noTitles === true, rounds);
+  const c1 = s.cues.find(c => c.id === 'c-semi1');
+  check('舊名單搬到 Cue 上', c1.lineup && c1.lineup.l[0] === '舊名單' && !s.results.battles.semi1.names, JSON.stringify(c1.lineup));
+  check('預設模式：稱號放在照片框裡', s.layouts.battle.rt.mode === 'photo');
   check('舊存檔補上預設稱號', s.layouts.battle.rt.titles.join() === '先鋒,策應,中樞,副將,主將');
   check('預設用內建書法 PNG', s.layouts.battle.rt.images.length === 5 && s.layouts.battle.rt.images[0] === 'builtin/round-1.png');
   check('內建 PNG 可以讀到', (await fetch(BASE + '/builtin/round-5.png')).status === 200);
 
-  await ops([{ op: 'set', path: ['results', 'top4'], value: ['t1', 't7', 't2', 't4'] }, { op: 'set', path: ['show', 'cueId'], value: 'c-semi1' }, { op: 'set', path: ['show', 'seq'], value: 2 },
-    { op: 'set', path: ['results', 'battles', 'semi1', 'names'], value: { l: ['小明'], r: ['阿華'] } }]);
+  await ops([{ op: 'set', path: ['layouts', 'battle', 'rt', 'mode'], value: 'side' }, { op: 'set', path: ['results', 'top4'], value: ['t1', 't7', 't2', 't4'] }, { op: 'set', path: ['show', 'cueId'], value: 'c-semi1' }, { op: 'set', path: ['show', 'seq'], value: 2 },
+    { op: 'set', path: ['cues', s.cues.findIndex(c => c.id === 'c-semi1'), 'lineup'], value: { l: ['小明'], r: ['阿華'] } }]);
 
   const browser = await chromium.launch({ executablePath: CHROME });
   const errors = [];
@@ -97,7 +103,7 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   await ctrl.keyboard.type('阿傑');
   await sleep(500);
   s = await state();
-  const nm = s.results.battles.semi1.names;
+  const nm = s.cues.find(c => c.id === 'c-semi1').lineup;
   check('打字中被其他裝置更新也不會掉字', nm.l[4] === 'KENJI', JSON.stringify(nm.l));
   check('Tab 跳到右方繼續輸入', nm.r[4] === '阿傑', JSON.stringify(nm.r));
   check('舊的名字保留', nm.l[0] === '小明' && nm.r[0] === '阿華');
@@ -129,7 +135,14 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   await sleep(400);
   await ctrl.locator('.cue[data-id="c-final"]').click();
   await sleep(300);
-  for (const tab of ['名單', '回合稱號', '動畫', '基本']) { await ctrl.locator('.tabs button', { hasText: tab }).click(); await sleep(250); }
+  for (const tab of ['回合稱號', '動畫', '基本']) { await ctrl.locator('.tabs button', { hasText: tab }).click(); await sleep(250); }
+  check('編排「基本」分頁就有出賽名單', await ctrl.locator('.insp .lineup .lrow:not(.lhead)').count() === 5);
+  const fin = ctrl.locator('.insp .lineup .lrow:not(.lhead)').nth(0).locator('input').first();
+  await fin.fill('決賽先鋒A');
+  await sleep(400);
+  check('決賽名單存在決賽 Cue', (await state()).cues.find(c => c.id === 'c-final').lineup.l[0] === '決賽先鋒A');
+  await ctrl.screenshot({ path: path.join(SHOTS, 'rounds-basic.png') });
+  // 清除比賽結果不會清掉名單
   await ctrl.locator('.tabs button', { hasText: '回合稱號' }).click();
   await sleep(250);
   await ctrl.screenshot({ path: path.join(SHOTS, 'rounds-edit.png') });
@@ -153,8 +166,24 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   check('輸出跟著改：高 300、在中心 ±700', Math.abs(r.L.h - 300) < 2 && Math.abs(r.L.cx - 260) < 15 && Math.abs(r.R.cx - 1660) < 15, Math.round(r.L.h) + ' ' + Math.round(r.L.cx) + ' ' + Math.round(r.R.cx));
   await ctrl.locator('.insp h3', { hasText: '稱號位置與大小' }).scrollIntoViewIfNeeded();
   await ctrl.screenshot({ path: path.join(SHOTS, 'rounds-edit2.png') });
-  await ops([{ op: 'set', path: ['layouts', 'battle', 'rt', 'on'], value: false }]);
-  await sleep(800);
+  // 照片框模式：稱號取代團隊照片，放在框正中央
+  await ops([{ op: 'set', path: ['layouts', 'battle', 'v'], value: Object.assign({}, s.layouts.battle.v, { rh: 400, rx: 810, ry: 440 }) }]);
+  await out.evaluate(() => window.fd.cmd([{ op: 'set', path: ['layouts', 'battle', 'rt', 'mode'], value: 'photo' }, { op: 'set', path: ['results', 'battles', 'semi1', 'round'], value: 3 }], { name: 'round', battle: 'semi1', round: 3 }));
+  await sleep(1500);
+  r = await read();
+  const pm = await out.evaluate(() => { const sc = document.querySelector('.scene:last-child'); const b = sc.querySelector('.pbox').getBoundingClientRect(); return { cx: b.left + b.width / 2, cy: b.top + b.height / 2, h: b.height, photo: [...sc.querySelectorAll('.pbox .ph img')].map(i => getComputedStyle(i).visibility).join() }; });
+  const ib = await out.evaluate(() => { const r = document.querySelector('.scene:last-child .rimg').getBoundingClientRect(); return { cy: r.top + r.height / 2 }; });
+  check('照片框模式：「中樞」圖在左框正中央', r.L.v === 'img:round-3.png' && Math.abs(r.L.cx - pm.cx) < 3 && Math.abs(ib.cy - pm.cy) < 3 && r.L.h < pm.h, Math.round(r.L.cx) + ',' + Math.round(ib.cy) + ' vs ' + Math.round(pm.cx) + ',' + Math.round(pm.cy));
+  check('照片框模式：團隊照片隱藏', pm.photo === 'hidden,hidden', pm.photo);
+  await out.screenshot({ path: path.join(SHOTS, 'rounds-photo.png') });
+  // 表演賽：不顯示稱號，照片照常
+  await ops([{ op: 'set', path: ['show', 'cueId'], value: 'c-exhib' }]);
+  await sleep(3500);
+  r = await read();
+  const exPhoto = await out.evaluate(() => [...document.querySelectorAll('.scene:last-child .pbox .ph img')].map(i => getComputedStyle(i).visibility).join());
+  check('表演賽：沒有稱號、Logo 照常顯示', r.L.v === '' && r.R.v === '' && exPhoto === 'visible,visible', exPhoto);
+  await ops([{ op: 'set', path: ['show', 'cueId'], value: 'c-semi1' }, { op: 'set', path: ['layouts', 'battle', 'rt', 'on'], value: false }]);
+  await sleep(3500);
   r = await read();
   check('關閉稱號：輸出不顯示', r.L.v === '' && r.R.v === '' && r.names.join('') === '');
 
