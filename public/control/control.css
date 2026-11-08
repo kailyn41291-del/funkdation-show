@@ -281,3 +281,12 @@ table.grid input[type=text] { width: 100%; }
 .rtrow .rtn { font-size: 13px; color: var(--muted); }
 .rtrow input { min-width: 0; }
 .rtthumb { width: 44px; height: 44px; background: center / contain no-repeat, repeating-conic-gradient(#8882 0 25%, #0000 0 50%) 0 0 / 10px 10px; background-color: #d9cfc0; border-radius: 4px; }
+
+/* 出賽名單：選人＋手動輸入 */
+.lineup .lcell { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lineup select { width: 100%; min-width: 0; }
+/* 成員字卡 */
+.mlist { display: grid; gap: 6px; margin: 8px 0; }
+.mrow { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.mthumb { height: 40px; border-radius: 4px; background: center / contain no-repeat; background-color: #d9cfc0; }
+.mthumb.none { display: flex; align-items: center; justify-content: center; font-size: 11px; color: #7a6a5a; }

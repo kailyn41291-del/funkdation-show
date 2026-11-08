@@ -816,7 +816,10 @@
       iT.alt = '';
       var nm = Txt(sc.root, 'zh');
       nm.t.classList.add('rname');
-      return { tW: tW, tT: tT, iW: iW, iT: iT, nm: nm };
+      // 成員字卡（選了有字卡的成員時取代文字名字）
+      var cW = mk('div', 'txt rimgw', sc.root), cT = mk('img', 't rimg rcard', cW);
+      cT.alt = '';
+      return { tW: tW, tT: tT, iW: iW, iT: iT, nm: nm, cW: cW, cT: cT };
     }
     var rtA = RT(), rtB = RT(), nmL = rtA.nm, nmR = rtB.nm;
     var sealL = mk('div', 'seal', sc.root), sealR = mk('div', 'seal', sc.root);
@@ -826,7 +829,7 @@
     var GROUPS = {
       fr: [[pL.fr], [pR.fr]], ph: [[pL.ph], [pR.ph]],
       nm: [[enL.t, zhL.t], [enR.t, zhR.t]], info: [[hIn, sL, sR, dv, tmIn]],
-      rt: [[rtA.tT, rtA.iT, rtB.tT, rtB.iT, nmL.t, nmR.t]]
+      rt: [[rtA.tT, rtA.iT, rtB.tT, rtB.iT, nmL.t, nmR.t, rtA.cT, rtB.cT]]
     };
     var ORDER = ['fr', 'ph', 'nm', 'info', 'rt'];
     function brushFont(name) { return "'" + String(name || 'FD Potta One').replace(/'/g, '') + "', var(--fzh)"; }
@@ -844,7 +847,7 @@
       // 照片框模式：團隊照片與外框都不顯示，只放稱號
       [pL, pR].forEach(function (p) { p.img.style.visibility = p.fr.style.visibility = photoMode ? 'hidden' : ''; });
       rtPhoto = photoMode;
-      [rtA.tW, rtA.iW, rtB.tW, rtB.iW, nmL.wrap, nmR.wrap].forEach(function (el) { el.style.display = on ? '' : 'none'; });
+      [rtA.tW, rtA.iW, rtB.tW, rtB.iW, nmL.wrap, nmR.wrap, rtA.cW, rtB.cW].forEach(function (el) { el.style.display = on ? '' : 'none'; });
       if (!on) return;
       var src = info.img ? asset(info.img) : '';
       var vert = rt.dir !== 'h', col = inkOf(rt.color);
@@ -904,10 +907,25 @@
           y = geo.cy + Math.max(heights[0], heights[1]) / 2 + gap;
           maxW = rw;
         }
-        // 各自縮放（長名字只縮自己），中心對齊同一條線
-        [[nmL, geo.cl], [nmR, geo.cr]].forEach(function (o) {
-          var got = o[0].at(o[1], y, ns, maxW);
-          px(o[0].wrap, { top: y + (ns - got) / 2 });
+        // 各自縮放（長名字只縮自己），中心對齊同一條線；有字卡的用字卡（高度「字卡高度」）
+        var ch = v.nch || 90;
+        [[nmL, geo.cl, info.lCard, rtA], [nmR, geo.cr, info.rCard, rtB]].forEach(function (o) {
+          var card = o[2] ? asset(o[2]) : '', box = o[3];
+          o[0].wrap.style.display = card ? 'none' : '';
+          box.cW.style.display = card ? '' : 'none';
+          if (!card) {
+            var got = o[0].at(o[1], y, ns, maxW);
+            px(o[0].wrap, { top: y + (ns - got) / 2 });
+            return;
+          }
+          if (box.cT.getAttribute('src') !== card) box.cT.src = card;
+          var fitC = function () {
+            if (gen !== rtGen) return;
+            var nw = box.cT.naturalWidth || 1, nh = box.cT.naturalHeight || 1, k = Math.min(ch / nh, Math.max(maxW, pw) / nw);
+            px(box.cT, { width: nw * k, height: nh * k });
+            px(box.cW, { left: o[1], top: y });
+          };
+          if (box.cT.complete && box.cT.naturalWidth) fitC(); else box.cT.onload = fitC;
         });
       }
       place(rtA, geo.cl, function (hh) { heights[0] = hh; names(); });
@@ -1075,7 +1093,7 @@
         // 回合稱號與名字：換成新回合的字，用墨跡（動畫分頁「回合稱號」）重新登場
         roundTexts(ev.round);
         var rs = sc.ctx.layout.anim.steps.rt || { fx: 'ink' }, rd = Math.max(300, sc.ctx.layout.anim.duration || 500);
-        [rtA.tT, rtA.iT, rtB.tT, rtB.iT, nmL.t, nmR.t].forEach(function (el, i) {
+        [rtA.tT, rtA.iT, rtB.tT, rtB.iT, nmL.t, nmR.t, rtA.cT, rtB.cT].forEach(function (el, i) {
           if (!effectsOn) { FX.show(el); return; }
           FX.hide(el);
           var id = setTimeout(function () { FX.run(el, rs.fx || 'ink', rd, sc.tl); }, i < 4 ? 0 : 200);
@@ -1384,7 +1402,21 @@
       if (im.decode) im.decode().catch(function () {});
       preloaded['rt:' + src] = im;
     });
-    S.cues.forEach(function (c) { var nb = c.lineup || {}; brush = brush.concat(nb.l || [], nb.r || []); });
+    S.cues.forEach(function (c) {
+      if (c.type !== 'battle') return;
+      ['l', 'r'].forEach(function (sd) {
+        ((c.lineup || {})[sd] || []).forEach(function (raw, i) {
+          var e = FDM.lineupEntry(S, c, sd, i);
+          if (e.text) brush.push(e.text);
+          if (e.card && !preloaded['card:' + e.card]) {
+            var im = new Image();
+            im.src = asset(e.card);
+            if (im.decode) im.decode().catch(function () {});
+            preloaded['card:' + e.card] = im;
+          }
+        });
+      });
+    });
     var brushAll = brush.filter(Boolean).join(' ');
     var all = texts.filter(Boolean).join(' ') + ' ' + brushAll;
     sig = all + '|' + ev.fontEn + '|' + ev.fontZh + '|' + (rtL && rtL.font) + '|' + (rtL && rtL.nameFont);

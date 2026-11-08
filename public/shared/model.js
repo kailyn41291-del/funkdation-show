@@ -65,12 +65,31 @@
     var battleId = cue ? cue.battle : cueOrBattle;
     var b = state && state.results && state.results.battles && state.results.battles[battleId];
     var i = (round || (b && b.round) || 1) - 1, nm = (cue && cue.lineup) || {};
+    var show = rt.showNames !== false;
+    var L1 = show ? lineupEntry(state, cue, 'l', i) : { text: '', card: '' }, R1 = show ? lineupEntry(state, cue, 'r', i) : { text: '', card: '' };
     return {
       title: rt.on === false ? '' : ((rt.titles || [])[i] || ''),
       img: rt.on === false ? '' : ((rt.images || [])[i] || ''),
-      l: ((nm.l || [])[i] || '').trim(),
-      r: ((nm.r || [])[i] || '').trim()
+      l: L1.text, r: R1.text, lCard: L1.card, rCard: R1.card
     };
+  }
+  // 出賽名單的一格：字串＝直接打的名字；{ m: 成員 id }＝從隊伍成員選（有字卡就用字卡）
+  // 成員必須屬於這一側目前的隊伍（四強換隊後，舊隊伍的人不會出現）
+  function lineupEntry(state, cue, side, i) {
+    var raw = cue && cue.lineup && (cue.lineup[side] || [])[i];
+    if (!raw) return { text: '', card: '' };
+    if (typeof raw === 'string') return { text: raw.trim(), card: '' };
+    if (raw.m) {
+      var t = resolve(state, side === 'l' ? cue.left : cue.right), mem = memberOf(t, raw.m);
+      if (!mem) return { text: '', card: '' };
+      return { text: (mem.name || '').trim(), card: mem.card ? (mem.card.trim || mem.card.src || '') : '' };
+    }
+    return { text: '', card: '' };
+  }
+  function memberOf(team, id) {
+    var ms = (team && team.members) || [];
+    for (var k = 0; k < ms.length; k++) if (ms[k].id === id) return ms[k];
+    return null;
   }
 
   // 九隊總覽：上排 top 隊、其餘在下排
@@ -209,7 +228,7 @@
 
   global.FDM = {
     zhNum: zhNum, TYPES: TYPES, BATTLES: BATTLES, FX_IN: FX_IN, FX_OUT: FX_OUT,
-    teamById: teamById, judgeById: judgeById, PEOPLE: PEOPLE, isPerson: isPerson, roundInfo: roundInfo, peopleOf: peopleOf, personById: personById, overviewRows: overviewRows, TOP4_RANK: TOP4_RANK, top4Label: top4Label, battleCue: battleCue, resolve: resolve, sourceLabel: sourceLabel,
+    teamById: teamById, judgeById: judgeById, PEOPLE: PEOPLE, isPerson: isPerson, roundInfo: roundInfo, lineupEntry: lineupEntry, memberOf: memberOf, peopleOf: peopleOf, personById: personById, overviewRows: overviewRows, TOP4_RANK: TOP4_RANK, top4Label: top4Label, battleCue: battleCue, resolve: resolve, sourceLabel: sourceLabel,
     cueTitle: cueTitle, cueSub: cueSub, layoutKey: layoutKey, layoutFor: layoutFor,
     chain: chain, PRESETS: PRESETS, presetAnim: presetAnim, line2: line2
   };

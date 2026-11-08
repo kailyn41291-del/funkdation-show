@@ -57,7 +57,7 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   const read = () => out.evaluate(() => {
     const sc = document.querySelector('.scene:last-child');
     const shown = el => el && getComputedStyle(el.parentNode).display !== 'none' && +getComputedStyle(el).opacity > 0.5;
-    const imgs = [...sc.querySelectorAll('.rimg')], tts = [...sc.querySelectorAll('.rtitle')], n = [...sc.querySelectorAll('.rname')];
+    const imgs = [...sc.querySelectorAll('.rimg:not(.rcard)')], tts = [...sc.querySelectorAll('.rtitle')], n = [...sc.querySelectorAll('.rname')];
     const side = i => {
       const el = shown(imgs[i]) ? imgs[i] : shown(tts[i]) && tts[i].textContent ? tts[i] : null;
       if (!el) return { v: '' };

@@ -1273,17 +1273,36 @@
     var ci = S.cues.indexOf(c), lp0 = ['cues', ci, 'lineup'], b = getAt(S, ['results', 'battles', c.battle]) || {}, nm = c.lineup || {};
     var rt = (S.layouts.battle && S.layouts.battle.rt) || {}, titles = rt.titles || [];
     var tL = FDM.resolve(S, c.left), tR = FDM.resolve(S, c.right), n = Math.max(1, c.rounds || 5);
-    function input(side, i) {
-      var v = ((nm[side] || [])[i]) || '';
+    function put(side, i, val) {
+      var cur = getAt(S, lp0) || {};
+      var arr = (cur[side] || []).slice();
+      while (arr.length < n) arr.push('');
+      arr[i] = val;
+      setPath(lp0.concat(side), arr);
+    }
+    function textInput(side, i, v) {
       var el = h('input', { type: 'text', value: v, placeholder: '（不填）', maxlength: 40, 'data-keep': c.battle + side + i, 'aria-label': (side === 'l' ? '左方' : '右方') + '第 ' + (i + 1) + ' 回合舞者' });
-      el.addEventListener('input', function () {
-        var cur = getAt(S, lp0) || {};
-        var arr = (cur[side] || []).slice();
-        while (arr.length < n) arr.push('');
-        arr[i] = el.value;
-        setPath(lp0.concat(side), arr);
-      });
+      // 手動輸入模式下清空也要留在手動輸入（存一個空白）
+      el.addEventListener('input', function () { put(side, i, el.value || (el.dataset.manual ? ' ' : '')); });
       return el;
+    }
+    // 一格：這隊有成員（字卡）就用選單選人；也可以「手動輸入」或「不顯示」
+    function input(side, i) {
+      var raw = (nm[side] || [])[i] || '', team = side === 'l' ? tL : tR;
+      var ms = (team && !team._ph && team.members) || [];
+      if (!ms.length) return textInput(side, i, typeof raw === 'string' ? raw : '');
+      var val = raw && typeof raw === 'object' ? raw.m : typeof raw === 'string' && raw ? '__text' : '';
+      var opts = [['', '（不顯示）']].concat(ms.map(function (m) { return [m.id, (m.name || '（未命名）') + (m.card ? '' : '（無字卡）')]; }), [['__text', '手動輸入…']]);
+      if (val && val !== '__text' && !FDM.memberOf(team, val)) val = '';
+      var s = sel(opts, val, function (v) {
+        if (v === '__text') put(side, i, ' ');
+        else put(side, i, v ? { m: v } : '');
+        renderInspector();
+      }, { 'aria-label': (side === 'l' ? '左方' : '右方') + '第 ' + (i + 1) + ' 回合選人', 'data-keep': c.battle + side + i + 's' });
+      if (val !== '__text') return s;
+      var t = textInput(side, i, String(raw).trim());
+      t.dataset.manual = '1';
+      return h('div', { class: 'lcell' }, s, t);
     }
     var rows = [];
     for (var i = 0; i < n; i++) {
@@ -1296,7 +1315,7 @@
       h('div', { class: 'lineup' },
         h('div', { class: 'lrow lhead' }, h('div'), h('div', { text: '左方　' + (tL && !tL._ph ? tL.en : FDM.sourceLabel(c.left) + '（未決定）') }), h('div', { text: '右方　' + (tR && !tR._ph ? tR.en : FDM.sourceLabel(c.right) + '（未決定）') })),
         rows),
-      h('div', { class: 'hint', text: live ? '演出中也可以臨時修改，輸出畫面即時更新。' : '比賽前先在這裡填好每個稱號上場的舞者（存在這個 Cue，清除比賽結果不會清掉）。有填名字就和稱號一起顯示，沒填只顯示稱號。演出中也可以在演出面板臨時修改。' })]);
+      h('div', { class: 'hint', text: (live ? '演出中也可以臨時修改，輸出畫面即時更新。' : '比賽前先在這裡選好每個稱號上場的舞者（存在這個 Cue，清除比賽結果不會清掉）。演出中也可以在演出面板臨時修改。') + '隊伍頁上傳了成員字卡的隊伍可以直接選人，畫面會顯示那個人的字卡；選「不顯示」或不填就只有稱號。四強的隊伍要等四強選好後才能選人。' })]);
   }
   // 回合稱號設定（所有對戰共用）
   var BRUSH_FONTS = [['FD Potta One', '霸氣毛筆（Potta One，預設）'], ['FD Yuji Boku', '傳統書法（Yuji Boku）'], ['FD Reggae One', '粗獷筆刷（Reggae One）']];
@@ -1336,7 +1355,9 @@
         : [sl(v.concat('rh'), '大小（高度）', 80, 900), sl(v.concat('rx'), '左右位置', 300, 950), sl(v.concat('ry'), '上下位置', 100, 1000),
           h('div', { class: 'hint', text: '左右兩邊一起調、保持對稱。「左右位置」是離畫面中心的距離：數字越大越靠外側。' })],
       h('h3', { text: '名字' }),
-      sl(v.concat('ns'), '名字字級', 16, 160), sl(v.concat('rng'), photoMode ? '名字與隊名間距' : '名字與稱號間距', 0, 200),
+      fld('顯示', chk('顯示出賽名字／字卡（關掉就只有稱號）', rp.concat('showNames'))),
+      sl(v.concat('nch'), '字卡高度', 30, 300),
+      sl(v.concat('ns'), '名字字級（沒有字卡時）', 16, 160), sl(v.concat('rng'), photoMode ? '名字與隊名間距' : '名字與稱號間距', 0, 200),
       photoMode ? null : sl(v.concat('rw'), '名字最大寬度', 60, 600),
       fld('名字字型', selPath(rp.concat('nameFont'), [['brush', '跟稱號文字同一個書法字型'], ['title', '跟隊名一樣']].concat(BRUSH_FONTS, [['Noto Serif TC', '思源宋體 Noto Serif TC'], ['Cinzel', 'Cinzel（英文）']],
         (S.event.fonts || []).map(function (f) { return [f.name, f.name + '（上傳）']; })), function () { renderInspector(); }), '可以到「素材與字型」上傳自己的字型'),
@@ -1510,8 +1531,9 @@
     if (!FDM.teamById(S, ui.team) && S.teams[0]) ui.team = S.teams[0].id;
     var t = FDM.teamById(S, ui.team);
     var mon = monitor('/output/?preview=' + encodeURIComponent('__team:' + ui.team), '單隊展示預覽', 'prev');
-    var right = h('div', { class: 'sticky' }, mon.el, h('div', { class: 'card' }, t ? h('div', { id: 'photoEd' }) : null));
+    var right = h('div', { class: 'sticky' }, mon.el, h('div', { class: 'card' }, t ? h('div', { id: 'photoEd' }) : null), t ? h('div', { class: 'card', id: 'memberEd' }) : null);
     if (t) photoEditor(right.querySelector('#photoEd'), t, function () { renderPage(true); });
+    if (t) memberEditor(right.querySelector('#memberEd'), t);
     var table = h('table', { class: 'grid' },
       h('thead', null, h('tr', null, ['#', '照片', '英文隊名', '中文隊名', '標籤（城市）', '種子', '表演賽', ''].map(function (x) { return h('th', { text: x }); }))),
       h('tbody', null, S.teams.map(function (tm, i) {
@@ -1551,6 +1573,43 @@
         h('h3', { text: '收照片規範（建議提供給各隊）' }),
         h('div', { class: 'hint', html: '3:2 橫式、全員入鏡、背景單純、寬度至少 1800px。<br>收到後統一去背（Photoshop 或 remove.bg），上傳透明背景 PNG 會自動裁掉四周空白並放大人物。' })),
       right));
+  }
+  // 成員字卡：每團每個人一張名字字卡（PNG），對戰的出賽名單可以直接選人
+  function memberEditor(box, t) {
+    var ti = S.teams.indexOf(t), mp = ['teams', ti, 'members'], ms = t.members || [];
+    function addFiles(files) {
+      var list = clone(getAt(S, mp) || []);
+      var chain = Promise.resolve();
+      files.forEach(function (f) {
+        chain = chain.then(function () { return processPhoto(f); }).then(function (r) {
+          var name = f.name.replace(/\.\w+$/, '').replace(/[-_]?trim$/, '').trim();
+          // 同名的人：換字卡；沒有就新增
+          var hit = list.filter(function (m) { return m.name === name; })[0];
+          if (hit) hit.card = { src: r.src, trim: r.trim };
+          else list.push({ id: uid('m'), name: name, card: { src: r.src, trim: r.trim } });
+        });
+      });
+      chain.then(function () { setPath(mp, list); toast('已加入 ' + files.length + ' 張字卡'); renderPage(true); }).catch(fail);
+    }
+    var rows = ms.map(function (m, j) {
+      var src = m.card ? (m.card.trim || m.card.src) : '';
+      return h('div', { class: 'mrow' },
+        src ? h('div', { class: 'mthumb', style: 'background-image:url("/' + src.replace(/^\//, '') + '")' }) : h('div', { class: 'mthumb none', text: '無字卡' }),
+        txtPath(mp.concat([j, 'name']), '名字'),
+        uploadBtn(src ? '換字卡' : '上傳字卡', 'image/png,image/webp,image/jpeg', false, function (f) {
+          processPhoto(f[0]).then(function (r) { setPath(mp.concat([j, 'card']), { src: r.src, trim: r.trim }); renderPage(true); }).catch(fail);
+        }),
+        h('button', { class: 'ghost', text: '✕', title: '刪除', onclick: function () {
+          if (!confirm('刪除成員「' + (m.name || '') + '」？已選這個人的出賽名單會變成不顯示。')) return;
+          var a = clone(ms); a.splice(j, 1); setPath(mp, a); renderPage(true);
+        } }));
+    });
+    add(box, [h('h3', { text: '成員字卡（' + (t.en || '') + '）', style: 'margin-top:0' }),
+      h('div', { class: 'btnrow' },
+        uploadBtn('上傳字卡（可多選）', 'image/png,image/webp,image/jpeg', true, addFiles),
+        h('button', { class: 'ghost', text: '＋ 新增成員（只打名字）', onclick: function () { var a = clone(ms); a.push({ id: uid('m'), name: '', card: null }); setPath(mp, a); renderPage(true); } })),
+      rows.length ? h('div', { class: 'mlist' }, rows) : h('div', { class: 'faint', text: '還沒有成員' }),
+      h('div', { class: 'hint', text: '檔名就是名字，例如「小明.png」會新增成員「小明」，一次可以選這團所有人的字卡；同名的會換成新字卡。透明背景 PNG 會自動裁掉四周空白。對戰 Cue 的出賽名單就能直接選人。' })]);
   }
   function moveTeam(i, d) { var j = i + d; if (j < 0 || j >= S.teams.length) return; var a = clone(S.teams); var t = a[i]; a[i] = a[j]; a[j] = t; setPath(['teams'], a); renderPage(false); }
 
