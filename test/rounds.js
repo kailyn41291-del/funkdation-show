@@ -76,7 +76,7 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
 
   const titles = ['先鋒', '策應', '中樞', '副將', '主將'];
   for (let i = 2; i <= 5; i++) {
-    await out.evaluate(i => window.fd.cmd([{ op: 'set', path: ['results', 'battles', 'semi1', 'round'], value: i }], { name: 'round', battle: 'semi1', round: i }), i);
+    await out.evaluate(i => window.fd.cmd([{ op: 'set', path: ['results', 'battles', 'semi1', 'round'], value: i }], { event: { name: 'round', battle: 'semi1', round: i } }), i);
     await sleep(1800);
     r = await read();
     check('第 ' + i + ' 回合：' + titles[i - 1] + ' 圖（沒填名字只有稱號）', r.L.v === 'img:round-' + i + '.png' && r.R.v === r.L.v && r.names.join('') === '', r.L.v + ' / ' + r.names.join());
@@ -111,7 +111,7 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   r = await read();
   check('輸出畫面即時顯示這回合的名字', r.names.join() === 'KENJI,阿傑', r.names.join());
   // 沒有圖的回合改用直式書法字
-  await out.evaluate(() => window.fd.cmd([{ op: 'set', path: ['layouts', 'battle', 'rt', 'images', 4], value: null }], { name: 'round', battle: 'semi1', round: 5 }));
+  await out.evaluate(() => window.fd.cmd([{ op: 'set', path: ['layouts', 'battle', 'rt', 'images', 4], value: null }], { event: { name: 'round', battle: 'semi1', round: 5 } }));
   await sleep(1500);
   r = await read();
   check('沒有圖：左右直式文字「主將」', r.L.v === 'txt:主將' && r.R.v === 'txt:主將' && r.L.vert === 'vertical-rl' && r.L.h > r.L.w, r.L.v + ' ' + r.L.vert);
@@ -169,7 +169,7 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   await sleep(300);
   s = await state();
   check('可以調大小與位置', s.layouts.battle.v.rh === 300 && s.layouts.battle.v.rx === 700 && s.layouts.battle.v.ry === 500, JSON.stringify([s.layouts.battle.v.rh, s.layouts.battle.v.rx, s.layouts.battle.v.ry]));
-  await out.evaluate(() => window.fd.cmd([{ op: 'set', path: ['results', 'battles', 'semi1', 'round'], value: 1 }], { name: 'round', battle: 'semi1', round: 1 }));
+  await out.evaluate(() => window.fd.cmd([{ op: 'set', path: ['results', 'battles', 'semi1', 'round'], value: 1 }], { event: { name: 'round', battle: 'semi1', round: 1 } }));
   await sleep(1500);
   r = await read();
   check('輸出跟著改：高 300、在中心 ±700', Math.abs(r.L.h - 300) < 2 && Math.abs(r.L.cx - 260) < 15 && Math.abs(r.R.cx - 1660) < 15, Math.round(r.L.h) + ' ' + Math.round(r.L.cx) + ' ' + Math.round(r.R.cx));
@@ -177,7 +177,7 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   await ctrl.screenshot({ path: path.join(SHOTS, 'rounds-edit2.png') });
   // 照片框模式：稱號取代團隊照片，放在框正中央
   await ops([{ op: 'set', path: ['layouts', 'battle', 'v'], value: Object.assign({}, s.layouts.battle.v, { rh: 400, rx: 810, ry: 440 }) }]);
-  await out.evaluate(() => window.fd.cmd([{ op: 'set', path: ['layouts', 'battle', 'rt', 'mode'], value: 'photo' }, { op: 'set', path: ['results', 'battles', 'semi1', 'round'], value: 3 }], { name: 'round', battle: 'semi1', round: 3 }));
+  await out.evaluate(() => window.fd.cmd([{ op: 'set', path: ['layouts', 'battle', 'rt', 'mode'], value: 'photo' }, { op: 'set', path: ['results', 'battles', 'semi1', 'round'], value: 3 }], { event: { name: 'round', battle: 'semi1', round: 3 } }));
   await sleep(1500);
   r = await read();
   const pm = await out.evaluate(() => { const sc = document.querySelector('.scene:last-child'); const b = sc.querySelector('.pbox').getBoundingClientRect(); return { cx: b.left + b.width / 2, cy: b.top + b.height / 2, h: b.height, photo: [...sc.querySelectorAll('.pbox .ph img, .pbox .fr')].map(i => getComputedStyle(i).visibility).join() }; });

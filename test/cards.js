@@ -108,7 +108,7 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   await ops([{ op: 'set', path: ['layouts', 'battle', 'rt', 'namePos'], value: 'outer' }]);
   await sleep(800);
 
-  await out.evaluate(() => window.fd.cmd([{ op: 'set', path: ['results', 'battles', 'semi1', 'round'], value: 2 }], { name: 'round', battle: 'semi1', round: 2 }));
+  await out.evaluate(() => window.fd.cmd([{ op: 'set', path: ['results', 'battles', 'semi1', 'round'], value: 2 }], { event: { name: 'round', battle: 'semi1', round: 2 } }));
   await sleep(1800);
   r = await read();
   check('第 2 回合換成 KENJI 的字卡、右方沒填', r[0].startsWith('card:') && !r[0].includes(trimName) && r[1] === '', r.join(' | '));
@@ -128,7 +128,7 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   check('手動輸入：顯示文字', r[0] === 'txt:臨時換人', r[0]);
 
   // 整體關掉名字
-  await out.evaluate(() => window.fd.cmd([{ op: 'set', path: ['results', 'battles', 'semi1', 'round'], value: 1 }], { name: 'round', battle: 'semi1', round: 1 }));
+  await out.evaluate(() => window.fd.cmd([{ op: 'set', path: ['results', 'battles', 'semi1', 'round'], value: 1 }], { event: { name: 'round', battle: 'semi1', round: 1 } }));
   await ops([{ op: 'set', path: ['layouts', 'battle', 'rt', 'showNames'], value: false }]);
   await sleep(1500);
   r = await read();

@@ -77,7 +77,11 @@ function defaultLayouts() {
     top4: {
       bg: bg(),
       mode: 'step',
-      v: { w: 300, close: 24, vsg: 170, pg: 110, top: 340, pad: 40, ng: 24, ens: 38, zhs: 22, vss: 64 },
+      // arrange：stack＝上面一組、下面一組（照片較大）；line＝四隊同一排
+      arrange: 'stack',
+      head: { en: 'TOP 4', zh: '' },
+      v: { w: 300, close: 24, vsg: 170, pg: 110, top: 340, pad: 40, ng: 24, ens: 38, zhs: 22, vss: 64,
+        sw: 450, st: 200, srg: 430, svg: 220, hy: 60, hs: 72, hzs: 26 },
       anim: { duration: 500, overlap: 60, steps: { fr: step('fade'), ph: step('ink'), en: step('brush'), zh: step('brush') } },
       vsFx: 'slam', wait: 800, split: 800, itv: 1500
     },

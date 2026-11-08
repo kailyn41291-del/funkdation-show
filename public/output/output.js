@@ -652,7 +652,23 @@
       slots.push({ el: s, box: b, en: en, zh: zh, EL: { fr: b.fr, ph: b.ph, en: en.t, zh: zh.t } });
     }
     for (var j = 0; j < 2; j++) { var e = mk('div', 'vs', sc.root); e.textContent = 'VS'; vs.push(e); }
+    // 上方標題 TOP 4（可改字或留空）
+    var hd = mk('div', 'txt', sc.root), hdIn = mk('div', 't', hd);
+    hdIn.style.display = 'block';
+    var hdEn = mk('div', 'en ls-h1', hdIn), hdZh = mk('div', 'zh', hdIn);
+    hdEn.style.display = hdZh.style.display = 'block';
+    hdZh.style.marginTop = '8px';
+    hdZh.style.opacity = '.85';
     var ORDER = ['fr', 'ph', 'en', 'zh'];
+    function stacked() { return sc.ctx.layout.arrange === 'stack' && mode() !== 'row'; }
+    function head() {
+      var L = sc.ctx.layout, v = L.v, hdT = L.head || {};
+      hdEn.textContent = hdT.en || ''; hdZh.textContent = hdT.zh || '';
+      hd.style.display = hdT.en || hdT.zh ? '' : 'none';
+      hdEn.style.fontSize = (v.hs || 72) + 'px';
+      hdZh.style.fontSize = (v.hzs || 26) + 'px';
+      px(hd, { left: W / 2, top: v.hy == null ? 60 : v.hy });
+    }
     var open = [false, false], shown = 0;
     function mode() { return sc.ctx.layout.mode || 'step'; }
     function teamAt(i) {
@@ -663,8 +679,22 @@
       }
       return t;
     }
+    function slotW() { var v = sc.ctx.layout.v; return stacked() ? (v.sw || 450) : v.w; }
     function positions() {
-      var v = sc.ctx.layout.v, w = v.w, m = mode(), xs = [], vsx = [0, 0], close = Math.max(12, v.close);
+      var v = sc.ctx.layout.v, w = slotW(), m = mode(), xs = [], vsx = [0, 0], close = Math.max(12, v.close), h = Math.round(w * 2 / 3);
+      var ys = [v.top, v.top, v.top, v.top], vsy = [v.top + h / 2, v.top + h / 2];
+      if (stacked()) {
+        // 上面一組、下面一組，各自置中
+        for (var q = 0; q < 2; q++) {
+          var gq = (m === 'pair' || open[q]) ? (v.svg == null ? 220 : v.svg) : close, top = (v.st == null ? 200 : v.st) + q * (v.srg || 430);
+          xs[q * 2] = W / 2 - gq / 2 - w;
+          xs[q * 2 + 1] = W / 2 + gq / 2;
+          ys[q * 2] = ys[q * 2 + 1] = top;
+          vsx[q] = W / 2;
+          vsy[q] = top + h / 2;
+        }
+        return { xs: xs, ys: ys, vsx: vsx, vsy: vsy };
+      }
       if (m === 'row') {
         var tot = 4 * w + 3 * close, x0 = (W - tot) / 2;
         for (var i = 0; i < 4; i++) xs.push(x0 + i * (w + close));
@@ -677,26 +707,27 @@
           vsx[p] = pc[p];
         }
       }
-      return { xs: xs, vsx: vsx };
+      return { xs: xs, ys: ys, vsx: vsx, vsy: vsy };
     }
     function place(animatePair, dur) {
-      var v = sc.ctx.layout.v, w = v.w, h = Math.round(w * 2 / 3), P = positions();
+      var v = sc.ctx.layout.v, w = slotW(), h = Math.round(w * 2 / 3), P = positions();
+      head();
       slots.forEach(function (s, i) {
         var moving = animatePair !== undefined && Math.floor(i / 2) === animatePair;
         s.el.style.transition = moving ? 'left ' + dur + 'ms cubic-bezier(.65,0,.25,1)' : 'none';
-        px(s.el, { left: P.xs[i], top: v.top, width: w, height: h });
+        px(s.el, { left: P.xs[i], top: P.ys[i], width: w, height: h });
         var t = teamAt(i);
         s.box.set(t, 0, 0, w, h, v.pad, sc.ctx.preview);
         s.en.text(t ? t.en : '');
         s.zh.text(FDM.line2(S, t));
       });
       // 四隊隊名用同一個字級（以最長的隊名為準縮小）
-      var gap = Math.max(12, mode() === 'row' ? v.close : Math.min(v.close, v.vsg));
+      var gap = Math.max(12, mode() === 'row' ? v.close : Math.min(v.close, stacked() ? (v.svg == null ? 220 : v.svg) : v.vsg));
       var maxW = w + gap - 12;
       var es = fitGroup(slots.map(function (s) { return { txt: s.en, x: w / 2, y: h + v.ng, maxW: maxW }; }), v.ens);
       fitGroup(slots.map(function (s) { return { txt: s.zh, x: w / 2, y: h + v.ng + es + 10, maxW: maxW }; }), v.zhs);
       vs.forEach(function (e, p) {
-        px(e, { left: P.vsx[p], top: v.top + h / 2, fontSize: v.vss });
+        px(e, { left: P.vsx[p], top: P.vsy[p], fontSize: v.vss });
         if (mode() === 'row') FX.hide(e);
       });
     }
@@ -706,6 +737,7 @@
       shown = 0;
       slots.forEach(function (s) { ORDER.forEach(function (k) { FX.hide(s.EL[k]); }); });
       vs.forEach(FX.hide);
+      FX.show(hdIn);
       place();
     }
     function staticShow(n) {
@@ -714,6 +746,7 @@
       var m = mode();
       open = [m !== 'step' || n >= 2, m !== 'step' || n >= 4];
       place();
+      FX.show(hdIn);
       slots.forEach(function (s, i) { ORDER.forEach(function (k) { if (i < n) FX.show(s.EL[k]); else FX.hide(s.EL[k]); }); });
       vs.forEach(function (e, p) { if (m !== 'row' && (m === 'pair' ? n > p * 2 : open[p])) FX.show(e); else FX.hide(e); });
     }
@@ -739,6 +772,7 @@
     function auto() {
       hideAll();
       var tl = sc.tl, L = sc.ctx.layout, t = 0, itv = effectsOn ? L.itv : 0;
+      if (effectsOn) { FX.hide(hdIn); tl.at(0, function () { FX.run(hdIn, 'fade', 700, tl); }); t = 400; }
       var one = FDM.chain(ORDER, L.anim, 0, effectsOn)._end;
       for (var i = 0; i < 4; i++) {
         (function (i, t) { tl.at(t, function () { shown = i + 1; reveal(i, tl); }); })(i, t);

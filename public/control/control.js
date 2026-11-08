@@ -1194,12 +1194,31 @@
   // ---------- 四強 ----------
   function top4Basic(pane, c, cp, lp) {
     add(pane, [nameField(cp), h('h3', { text: '排列方式' }),
-      fld('模式', selPath(lp.concat('mode'), [['step', '逐組揭曉（兩隊出現後拉開、VS 落下）'], ['pair', '對戰組合（直接兩兩一組）'], ['row', '一排四隊']])),
+      fld('模式', selPath(lp.concat('mode'), [['step', '逐組揭曉（兩隊出現後拉開、VS 落下）'], ['pair', '對戰組合（直接兩兩一組）'], ['row', '一排四隊']], function () { renderInspector(); })),
+      fld('排列', selPath(lp.concat('arrange'), [['stack', '上面一組、下面一組（照片較大）'], ['line', '兩組左右並排']], function () { renderInspector(); }), '「一排四隊」模式不適用'),
+      h('h3', { text: '上方標題' }),
+      fld('英文', txtPath(lp.concat(['head', 'en']), '例如 TOP 4（留空不顯示）')),
+      fld('中文', txtPath(lp.concat(['head', 'zh']), '選填，例如 四強晉級')),
       h('div', { class: 'hint', text: '晉級隊伍在演出模式選擇：四強對戰 1 = 第 1 名 vs 第 4 名，四強對戰 2 = 第 2 名 vs 第 3 名。' })]);
     bgEditor(pane, lp.concat('bg'));
   }
   function top4Layout(pane, c, cp, lp) {
-    var v = lp.concat('v');
+    var v = lp.concat('v'), L = getAt(S, lp) || {}, stack = L.arrange === 'stack' && L.mode !== 'row';
+    function view(o) { return { after: function () { post({ name: 'top4view', open: o }); } }; }
+    add(pane, [h('h3', { text: '上方標題' }),
+      sl(v.concat('hy'), '標題位置', 0, 600), sl(v.concat('hs'), '英文字級', 12, 240), sl(v.concat('hzs'), '中文字級', 10, 120)]);
+    if (stack) {
+      add(pane, [h('h3', { text: '照片（上下兩組）' }),
+        sl(v.concat('sw'), '照片寬度', 150, 900, view(true)), sl(v.concat('st'), '上面一組的位置', -100, 900, view(true)), sl(v.concat('srg'), '上下兩組距離', 100, 1000, view(true)),
+        sl(v.concat('pad'), '框內邊距', 0, 300),
+        h('h3', { text: '間距' }),
+        sl(v.concat('close'), '併排間距', 12, 400, view(false)),
+        sl(v.concat('svg'), '拉開間距（VS 的位置）', 0, 800, view(true)),
+        h('div', { class: 'hint', text: '調整「併排間距」時預覽會顯示兩隊剛出現、還沒拉開的樣子；其他會顯示拉開後的樣子。' }),
+        h('h3', { text: '文字' }),
+        sl(v.concat('ng'), '隊名距照片', -200, 400), sl(v.concat('ens'), '英文字級', 12, 200), sl(v.concat('zhs'), '第二行字級', 12, 160), sl(v.concat('vss'), 'VS 字級', 12, 300)]);
+      return;
+    }
     add(pane, [h('h3', { text: '照片' }),
       sl(v.concat('w'), '照片寬度', 100, 900), sl(v.concat('top'), '垂直位置', -300, 1000), sl(v.concat('pad'), '框內邊距', 0, 300),
       h('h3', { text: '間距' }),
