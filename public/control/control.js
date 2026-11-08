@@ -1338,12 +1338,18 @@
       h('h3', { text: '名字' }),
       sl(v.concat('ns'), '名字字級', 16, 160), sl(v.concat('rng'), photoMode ? '名字與隊名間距' : '名字與稱號間距', 0, 200),
       photoMode ? null : sl(v.concat('rw'), '名字最大寬度', 60, 600),
-      fld('名字字型', selPath(rp.concat('nameFont'), [['brush', '跟稱號一樣的書法字'], ['title', '隊名字型']])),
+      fld('名字字型', selPath(rp.concat('nameFont'), [['brush', '跟稱號文字同一個書法字型'], ['title', '跟隊名一樣']].concat(BRUSH_FONTS, [['Noto Serif TC', '思源宋體 Noto Serif TC'], ['Cinzel', 'Cinzel（英文）']],
+        (S.event.fonts || []).map(function (f) { return [f.name, f.name + '（上傳）']; })), function () { renderInspector(); }), '可以到「素材與字型」上傳自己的字型'),
+      fld('名字顏色', (function () {
+        var cur = rt.nameColor || '';
+        var s = sel([['', '跟稱號一樣'], ['ink', '墨色（深）'], ['light', '米白（淺）'], ['custom', '自訂顏色']], cur && cur !== 'ink' && cur !== 'light' ? 'custom' : cur, function (v) { setPath(rp.concat('nameColor'), v === 'custom' ? '#ffffff' : v || null); renderInspector(); });
+        return cur && cur !== 'ink' && cur !== 'light' ? h('span', { style: 'display:inline-flex;gap:8px;align-items:center' }, s, colorPath(rp.concat('nameColor'))) : s;
+      })()),
       h('h3', { text: '文字樣式（沒有圖片的回合）' }),
       fld('排列', selPath(rp.concat('dir'), [['v', '直式'], ['h', '橫式']])),
       fld('書法字型', selPath(rp.concat('font'), fonts), '也可以到「素材與字型」上傳自己的書法字型'),
       photoMode ? null : sl(v.concat('rs'), '文字字級', 40, 400),
-      fld('顏色', selPath(rp.concat('color'), [['ink', '墨色（深）'], ['light', '米白（淺）']]), '名字也用這個顏色'),
+      fld('顏色', selPath(rp.concat('color'), [['ink', '墨色（深）'], ['light', '米白（淺）']])),
       h('div', { class: 'hint', text: '動畫在「動畫」分頁的「回合稱號與名字」。' })]);
   }
 

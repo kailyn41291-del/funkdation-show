@@ -148,12 +148,21 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   await ctrl.screenshot({ path: path.join(SHOTS, 'rounds-edit.png') });
   const t4 = ctrl.locator('.insp input[data-keep="rtitle3"]');
   await t4.fill('副將！');
-  await ctrl.locator('.insp select:has(option[value="FD Yuji Boku"])').selectOption('FD Yuji Boku');
+  await ctrl.locator('.insp .fld:has(> label:text-is("書法字型")) select').selectOption('FD Yuji Boku');
   check('回合稱號分頁有 5 個上傳按鈕', await ctrl.locator('.insp .rtrow').count() === 5);
   await sleep(500);
   s = await state();
   check('可以改稱號', s.layouts.battle.rt.titles[3] === '副將！');
   check('可以換書法字型', s.layouts.battle.rt.font === 'FD Yuji Boku');
+  // 名字字型、顏色獨立設定
+  await ctrl.locator('.insp .fld:has(> label:text-is("名字字型")) select').selectOption('FD Reggae One');
+  await sleep(400);
+  s = await state();
+  check('名字字型可以獨立選', s.layouts.battle.rt.nameFont === 'FD Reggae One' && s.layouts.battle.rt.font === 'FD Yuji Boku', s.layouts.battle.rt.nameFont);
+  await ops([{ op: 'set', path: ['layouts', 'battle', 'rt', 'nameColor'], value: '#ffffff' }]);
+  await sleep(800);
+  const nfStyle = await out.evaluate(() => { const n = document.querySelector('.scene:last-child .rname'); const cs = getComputedStyle(n); return cs.fontFamily + '|' + cs.color; });
+  check('輸出：名字用自己的字型與顏色', nfStyle.includes('FD Reggae One') && nfStyle.includes('255, 255, 255'), nfStyle);
   // 調整位置與大小（滑桿的數字框）
   const slider = label => ctrl.getByLabel(label + '數值', { exact: true });
   for (const [label, val] of [['大小（高度）', '300'], ['左右位置', '700'], ['上下位置', '500']]) { await slider(label).fill(val); await slider(label).press('Enter'); await sleep(200); }

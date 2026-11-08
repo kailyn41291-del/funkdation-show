@@ -857,9 +857,10 @@
         geo = { cl: W / 2 - (v.rx || 810), cr: W / 2 + (v.rx || 810), cy: v.ry || 440, maxH: v.rh || 400, maxW: 9999 };
       }
       var rs = v.rs || 150, rw = v.rw || 270, gap = v.rng == null ? 28 : v.rng;
-      var nf = rt.nameFont === 'title' ? 'var(--fen)' : brushFont(rt.font);
+      // 名字字型與顏色可以獨立設定：brush＝跟稱號文字同一個書法字型、title＝隊名字型、其他＝指定字型
+      var nf = rt.nameFont === 'title' ? 'var(--fen)' : rt.nameFont && rt.nameFont !== 'brush' ? brushFont(rt.nameFont) : brushFont(rt.font);
       nmL.t.style.fontFamily = nmR.t.style.fontFamily = nf;
-      nmL.t.style.color = nmR.t.style.color = col;
+      nmL.t.style.color = nmR.t.style.color = rt.nameColor ? inkOf(rt.nameColor) : col;
       nmL.text(info.l); nmR.text(info.r);
       var heights = [];
       function place(o, cx, done) {
@@ -1386,7 +1387,7 @@
     S.cues.forEach(function (c) { var nb = c.lineup || {}; brush = brush.concat(nb.l || [], nb.r || []); });
     var brushAll = brush.filter(Boolean).join(' ');
     var all = texts.filter(Boolean).join(' ') + ' ' + brushAll;
-    sig = all + '|' + ev.fontEn + '|' + ev.fontZh + '|' + (rtL && rtL.font);
+    sig = all + '|' + ev.fontEn + '|' + ev.fontZh + '|' + (rtL && rtL.font) + '|' + (rtL && rtL.nameFont);
     if (sig === warmSig) return;
     warmSig = sig;
     var idle = window.requestIdleCallback || function (f) { return setTimeout(f, 200); };
@@ -1404,6 +1405,7 @@
       document.fonts.load('900 64px "' + (ev.fontZh || 'Noto Serif TC') + '"', all).catch(function () {});
       document.fonts.load('700 64px "' + (ev.fontEn || 'Cinzel') + '"', all).catch(function () {});
       if (rtL && brushAll) document.fonts.load('400 64px "' + String(rtL.font || 'FD Potta One').replace(/"/g, '') + '"', brushAll).catch(function () {});
+      if (rtL && brushAll && rtL.nameFont && rtL.nameFont !== 'brush' && rtL.nameFont !== 'title') document.fonts.load('400 64px "' + String(rtL.nameFont).replace(/"/g, '') + '"', brushAll).catch(function () {});
     }
     idle(function () {
       for (var k in S.layouts) {
