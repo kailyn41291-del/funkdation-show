@@ -19,7 +19,7 @@ fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify({ rev: 7, state: o
 
 const st = new Store(dir).state;
 const L = st.layouts.champ;
-check('schema 升級到最新（4）', st.schema === 4, String(st.schema));
+check('schema 升級到最新（5）', st.schema === 5, String(st.schema));
 check('預設懸念文字換成 Battle／排舞賽', L.text.lc === 'THE BATTLE CHAMPION IS...' && L.text.lr === 'THE SHOWCASE CHAMPION IS...' && L.text.trr === 'SHOWCASE CHAMPION');
 check('自己改過的文字保留', L.text.rz === 'MY OWN TEXT');
 check('同框兩隊改成一樣大', L.v.cw === L.v.rw && L.v.cNs === L.v.rNs, L.v.cw + ' / ' + L.v.rw);

@@ -719,7 +719,20 @@
     } else if (c.type === 'top4') top4Panel(pane);
     else if (c.type === 'battle') battlePanel(pane, c);
     else if (c.type === 'champ') champPanel(pane, c);
-    else add(pane, [h('h3', { text: FDM.TYPES[c.type] }), h('div', { class: 'btnrow' }, h('button', { text: '重播登場', onclick: replay }))]);
+    else {
+      add(pane, [h('h3', { text: FDM.TYPES[c.type] }), h('div', { class: 'btnrow' }, h('button', { text: '重播登場', onclick: replay }))]);
+      // 評審討論時就先把四強選好（輸出畫面不會有任何變化，揭曉仍在「四強公布」）
+      if (c.type === 'idle' && c.pickTop4) {
+        top4Picker(pane);
+        var st = h('div', { class: 'hint' });
+        add(pane, st);
+        onLive(function () {
+          var n = S.results.top4.filter(Boolean).length;
+          st.className = n === 4 ? 'hint ok' : 'hint';
+          st.textContent = n === 4 ? '✓ 四強已選好。播到「四強公布」時直接揭曉即可。' : '已選 ' + n + ' / 4。在這裡選隊不會改變輸出畫面，觀眾看不到。';
+        });
+      }
+    }
   }
 
   // noGuest：四強、排舞賽冠軍等正式賽項目不列出表演賽的特邀隊伍
@@ -728,7 +741,8 @@
     return withEmpty ? [['', '（未選）']].concat(o) : o;
   }
 
-  function top4Panel(pane) {
+  // 四強選隊（兩組對戰卡片）：「四強公布」與「評審討論」等待機 Cue 共用，選的是同一份四強
+  function top4Picker(pane) {
     var err = h('div', { class: 'err' });
     // 四強位置 0/1 = 對戰 1（第 1 名 vs 第 4 名），2/3 = 對戰 2（第 2 名 vs 第 3 名）
     function pick(i) {
@@ -747,11 +761,14 @@
         h('div', { class: 'mrow' }, pick(a), h('div', { class: 'mvs', text: 'VS' }), pick(b)));
     }
     var picks = h('div', null, match(1, 0, 1), match(2, 2, 3));
+    add(pane, [h('h3', { text: '晉級隊伍（依對戰組合填入）' }), picks, err,
+      h('div', { class: 'hint', text: '依晉級名次填入：第 1 名打第 4 名、第 2 名打第 3 名，後面的對戰 Cue 會自動帶入。揭曉順序：對戰 1 的兩隊 → 對戰 2 的兩隊。' })]);
+  }
+  function top4Panel(pane) {
+    top4Picker(pane);
     var cnt = h('span', { class: 'muted' });
     onLive(function () { cnt.textContent = '已揭曉 ' + (S.show.top4Shown || 0) + ' / 4'; });
-    add(pane, [h('h3', { text: '晉級隊伍（依對戰組合填入）' }), picks, err,
-      h('div', { class: 'hint', text: '依晉級名次填入：第 1 名打第 4 名、第 2 名打第 3 名，後面的對戰 Cue 會自動帶入。揭曉順序：對戰 1 的兩隊 → 對戰 2 的兩隊。' }),
-      h('h3', { text: '揭曉' }), h('div', { class: 'btnrow' },
+    add(pane, [h('h3', { text: '揭曉' }), h('div', { class: 'btnrow' },
         h('button', { class: 'primary', text: '揭曉下一隊', onclick: function () {
           if (S.results.top4.some(function (x) { return !x; })) { toast('請先選好 4 隊', true); return; }
           var n = S.show.top4Shown || 0; if (n >= 4) return;
@@ -1269,6 +1286,7 @@
   function idleBasic(pane, c, cp, lp) {
     add(pane, [nameField(cp), h('h3', { text: '贊助商跑馬燈' }),
       fld('跑馬燈', chk('在主視覺上顯示贊助商跑馬燈', lp.concat('marquee'))),
+      fld('四強選隊', chk('演出時在這個 Cue 顯示四強選隊（評審討論用）', cp.concat('pickTop4'))),
       h('div', { class: 'btnrow' }, h('button', { text: '編輯贊助商 Logo →', onclick: function () { ui.page = 'sponsors'; saveUi(); renderHeader(); renderPage(false); } }))]);
     bgEditor(pane, lp.concat('bg'));
   }

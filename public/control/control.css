@@ -228,3 +228,5 @@ table.grid input[type=text] { width: 100%; }
 .mini .nowline { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mini .nowline b { color: var(--go-2); }
 .mini .nextline { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.hint.ok { color: var(--go-2); }

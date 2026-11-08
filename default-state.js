@@ -129,7 +129,7 @@ function defaultCues() {
   ];
   TEAM_LIST.forEach(([id], i) => cues.push({ id: 'c-team' + (i + 1), type: 'team', team: id }));
   cues.push(
-    { id: 'c-judge', type: 'idle', name: '評審討論' },
+    { id: 'c-judge', type: 'idle', name: '評審討論', pickTop4: true },
     exhibitionCue(),
     { id: 'c-top4', type: 'top4', name: '四強公布' },
     {
@@ -158,7 +158,7 @@ function defaultCues() {
 
 function defaultState() {
   return {
-    schema: 4,
+    schema: 5,
     event: {
       title: 'FUNKDATION VOL.4',
       fonts: [],

@@ -25,7 +25,15 @@ const CHAMP_OLD = {
 function migrate(state) {
   if ((state.schema || 0) < 3) migrate3(state);
   if ((state.schema || 0) < 4) migrate4(state);
+  if ((state.schema || 0) < 5) migrate5(state);
   return state;
+}
+// schema 5：「評審討論」Cue 演出時可以先選四強
+function migrate5(state) {
+  for (const c of state.cues || []) {
+    if (c.type === 'idle' && c.pickTop4 === undefined && (c.id === 'c-judge' || /評審討論/.test(c.name || ''))) c.pickTop4 = true;
+  }
+  state.schema = 5;
 }
 // schema 4：加入特別邀請的表演賽（三十聯軍 VS 華岡藝校，用 Logo）
 function migrate4(state) {
