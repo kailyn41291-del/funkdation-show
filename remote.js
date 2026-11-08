@@ -45,7 +45,9 @@ function safeEqual(a, b) {
 function createRemote({ dataDir, store, emit, lanAddresses, getPort }) {
   const file = path.join(dataDir, 'remote.json');
   // password：完整遙控（比分、四強、Timer）；timerPassword：Timer 專用（只能控制 Timer，選填）
-  let config = { enabled: false, password: '', timerPassword: '' };
+  // masterPassword：總控（手機版控台：切換 Cue 與所有演出操作，選填）
+  let config = { enabled: false, password: '', timerPassword: '', masterPassword: '' };
+  let onAuthChange = () => {};
   try { config = Object.assign(config, JSON.parse(fs.readFileSync(file, 'utf8'))); } catch { /* 第一次使用 */ }
   const tokens = new Map();   // token -> { exp, ip, role: 'full' | 'timer' }
   const fails = new Map();    // ip -> [時間...]
@@ -55,7 +57,14 @@ function createRemote({ dataDir, store, emit, lanAddresses, getPort }) {
     fs.writeFileSync(tmp, JSON.stringify(config, null, 2));
     fs.renameSync(tmp, file);
   }
-  function revokeAll() { tokens.clear(); }
+  function revokeAll() { tokens.clear(); onAuthChange(); }
+  // 給 WebSocket 用：網址上的 token 是哪一種身分
+  function roleOfToken(t) {
+    if (!config.enabled || !t) return null;
+    const rec = tokens.get(t);
+    if (!rec || rec.exp < Date.now()) return null;
+    return rec.role || 'full';
+  }
 
   function tokenOf(req) {
     const h = req.headers.authorization || '';
@@ -73,11 +82,14 @@ function createRemote({ dataDir, store, emit, lanAddresses, getPort }) {
   function authed(req) { return !!roleOf(req); }
 
   // ---------- 同網路裝置能開哪些網址 ----------
-  const LAN_OK = [/^\/remote(\/|$)/, /^\/timer\/?$/, /^\/clock(\/|$)/, /^\/output(\/|$)/, /^\/shared\//, /^\/fonts\//, /^\/builtin\//, /^\/assets\//, /^\/favicon\./, /^\/api\/remote\/(login|me|score|top4|timer)$/];
+  // 手機版總控用到控制台的網頁檔（不含資料）；修改仍要總控密碼的連線
+  const LAN_OK = [/^\/remote(\/|$)/, /^\/timer\/?$/, /^\/master\/?$/, /^\/clock(\/|$)/, /^\/control\/[\w.-]+\.(js|css)$/, /^\/api\/defaults$/, /^\/output(\/|$)/, /^\/shared\//, /^\/fonts\//, /^\/builtin\//, /^\/assets\//, /^\/favicon\./, /^\/api\/remote\/(login|me|score|top4|timer)$/];
   function gate(req, res, next) {
     if (isLocal(req)) return next();
-    if (req.path === '/' || req.path === '/control' || req.path.startsWith('/control/')) return res.redirect('/remote/');
+    if ((req.path === '/control/' || req.path === '/control') && req.query.phone === '1') return next();
+    if (req.path === '/' || req.path === '/control' || req.path === '/control/') return res.redirect('/remote/');
     if (req.path === '/timer' || req.path === '/timer/') return res.redirect('/remote/?timer=1');
+    if (req.path === '/master' || req.path === '/master/') return res.redirect('/remote/?master=1');
     if (LAN_OK.some(r => r.test(req.path)) && (req.method === 'GET' || req.path.startsWith('/api/remote/'))) return next();
     res.status(403).json({ ok: false, error: '這台裝置只能使用遙控網頁（/remote）' });
   }
@@ -137,16 +149,17 @@ function createRemote({ dataDir, store, emit, lanAddresses, getPort }) {
     // 這台電腦：設定密碼、看網址與 QR Code
     // Timer 專用頁的捷徑（這台電腦也能用）
     app.get(['/timer', '/timer/'], (req, res) => res.redirect('/remote/?timer=1'));
+    app.get(['/master', '/master/'], (req, res) => res.redirect('/remote/?master=1'));
     app.get('/api/remote/config', (req, res) => {
       if (!isLocal(req)) return res.status(403).end();
       const port = getPort();
       const qr = u => QRCode.toString(u, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
-      const list = networks().map(n => ({ ip: n.ip, name: n.name, virtual: n.virtual, url: `http://${n.ip}:${port}/remote/`, timerUrl: `http://${n.ip}:${port}/timer`, clockUrl: `http://${n.ip}:${port}/clock/` }));
-      Promise.all(list.map(x => Promise.all([qr(x.url), qr(x.timerUrl), qr(x.clockUrl)]).then(([a, b, c]) => Object.assign(x, { qr: a, timerQr: b, clockQr: c }))))
+      const list = networks().map(n => ({ ip: n.ip, name: n.name, virtual: n.virtual, url: `http://${n.ip}:${port}/remote/`, timerUrl: `http://${n.ip}:${port}/timer`, clockUrl: `http://${n.ip}:${port}/clock/`, masterUrl: `http://${n.ip}:${port}/master` }));
+      Promise.all(list.map(x => Promise.all([qr(x.url), qr(x.timerUrl), qr(x.clockUrl), qr(x.masterUrl)]).then(([a, b, c, d]) => Object.assign(x, { qr: a, timerQr: b, clockQr: c, masterQr: d }))))
         .then(urls => {
-          let full = 0, timerOnly = 0;
-          for (const r of tokens.values()) if (r.exp > Date.now()) { if (r.role === 'timer') timerOnly++; else full++; }
-          res.json({ enabled: config.enabled, password: config.password, timerPassword: config.timerPassword || '', devices: full + timerOnly, timerDevices: timerOnly, urls });
+          let full = 0, timerOnly = 0, master = 0;
+          for (const r of tokens.values()) if (r.exp > Date.now()) { if (r.role === 'timer') timerOnly++; else if (r.role === 'master') master++; else full++; }
+          res.json({ enabled: config.enabled, password: config.password, timerPassword: config.timerPassword || '', masterPassword: config.masterPassword || '', devices: full + timerOnly + master, timerDevices: timerOnly, masterDevices: master, urls });
         })
         .catch(e => res.status(500).json({ ok: false, error: e.message }));
     });
@@ -156,14 +169,21 @@ function createRemote({ dataDir, store, emit, lanAddresses, getPort }) {
       if (b.logoutAll) { revokeAll(); return res.json({ ok: true }); }
       const pw = b.password != null ? String(b.password).trim() : config.password;
       const tpw = b.timerPassword != null ? String(b.timerPassword).trim() : (config.timerPassword || '');
+      const mpw = b.masterPassword != null ? String(b.masterPassword).trim() : (config.masterPassword || '');
       const en = b.enabled != null ? !!b.enabled : config.enabled;
       if (en && pw.length < 4) return res.status(400).json({ ok: false, error: '密碼至少 4 個字' });
       if (tpw && tpw.length < 4) return res.status(400).json({ ok: false, error: 'Timer 專用密碼至少 4 個字（不需要就留空）' });
       if (tpw && tpw === pw) return res.status(400).json({ ok: false, error: 'Timer 專用密碼不能和完整遙控密碼一樣' });
+      if (mpw && mpw.length < 6) return res.status(400).json({ ok: false, error: '總控密碼至少 6 個字（不需要就留空）' });
+      if (mpw && (mpw === pw || mpw === tpw)) return res.status(400).json({ ok: false, error: '總控密碼不能和其他密碼一樣' });
       // 換密碼或關閉：所有手機都要重新登入；只換 Timer 專用密碼時，只登出 Timer 專用的裝置
       if (pw !== config.password || !en) revokeAll();
-      else if (tpw !== (config.timerPassword || '')) { for (const [k, r] of tokens) if (r.role === 'timer') tokens.delete(k); }
-      config = { enabled: en, password: pw, timerPassword: tpw };
+      else {
+        if (tpw !== (config.timerPassword || '')) { for (const [k, r] of tokens) if (r.role === 'timer') tokens.delete(k); }
+        if (mpw !== (config.masterPassword || '')) { for (const [k, r] of tokens) if (r.role === 'master') tokens.delete(k); }
+      }
+      config = { enabled: en, password: pw, timerPassword: tpw, masterPassword: mpw };
+      onAuthChange();
       saveConfig();
       res.json({ ok: true });
     });
@@ -176,14 +196,15 @@ function createRemote({ dataDir, store, emit, lanAddresses, getPort }) {
       if (list.length >= FAIL_MAX) return res.status(429).json({ ok: false, error: '密碼錯太多次，請 5 分鐘後再試' });
       if (!config.enabled) return res.status(403).json({ ok: false, error: '遙控網頁沒有開啟，請在控制台「設定」開啟' });
       const given = String((req.body || {}).password || '');
-      const isFull = !!config.password && safeEqual(given, config.password);
-      const isTimer = !isFull && !!config.timerPassword && safeEqual(given, config.timerPassword);
-      if (!isFull && !isTimer) {
+      const isMaster = !!config.masterPassword && safeEqual(given, config.masterPassword);
+      const isFull = !isMaster && !!config.password && safeEqual(given, config.password);
+      const isTimer = !isMaster && !isFull && !!config.timerPassword && safeEqual(given, config.timerPassword);
+      if (!isFull && !isTimer && !isMaster) {
         list.push(now); fails.set(ip, list);
         return res.status(401).json({ ok: false, error: '密碼不正確' });
       }
       fails.delete(ip);
-      const role = isFull ? 'full' : 'timer';
+      const role = isMaster ? 'master' : isFull ? 'full' : 'timer';
       const token = crypto.randomBytes(24).toString('base64url');
       tokens.set(token, { exp: now + TOKEN_TTL, ip, role });
       res.json({ ok: true, token, role });
@@ -194,7 +215,7 @@ function createRemote({ dataDir, store, emit, lanAddresses, getPort }) {
       return (req, res) => {
         const role = roleOf(req);
         if (!role) return res.status(401).json({ ok: false, error: '請重新輸入密碼' });
-        if (need === 'full' && role !== 'full') return res.status(403).json({ ok: false, error: 'Timer 專用密碼只能控制 Timer' });
+        if (need === 'full' && role === 'timer') return res.status(403).json({ ok: false, error: 'Timer 專用密碼只能控制 Timer' });
         try { res.json({ ok: true, rev: fn(req.body || {}) }); } catch (e) { res.status(400).json({ ok: false, error: e.message }); }
       };
     }
@@ -203,7 +224,7 @@ function createRemote({ dataDir, store, emit, lanAddresses, getPort }) {
     app.post('/api/remote/timer', guarded(b => timer(String(b.action || ''), b.seconds), 'timer'));
   }
 
-  return { gate, routes, isLocal, authed, revokeAll, score, top4, timer, get config() { return config; } };
+  return { gate, routes, isLocal, authed, revokeAll, roleOfToken, onAuthChange(fn) { onAuthChange = fn; }, score, top4, timer, get config() { return config; } };
 }
 
 module.exports = { createRemote, isLocal, networks };

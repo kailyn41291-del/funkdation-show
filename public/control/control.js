@@ -52,12 +52,32 @@
     (function () { try { return JSON.parse(localStorage.getItem('fd-ui') || '{}'); } catch (e) { return {}; } })());
   // 演出小面板（?mini=1）：永遠在最上層的小視窗，只有 GO 與播出中 Cue 的操作，搭配 OBS／Arena 時不用切視窗
   var MINI = /[?&]mini=1/.test(location.search);
+  // 手機版總控（?phone=1）：同 Wi-Fi 的手機用總控密碼登入，切換 Cue 與所有演出操作
+  var PHONE = /[?&]phone=1/.test(location.search);
+  var PHONE_TOKEN = null;
+  if (PHONE) {
+    MINI = true;
+    document.documentElement.classList.add('phone');
+    try { PHONE_TOKEN = localStorage.getItem('fd-remote-token'); } catch (e) { /* 私密瀏覽 */ }
+    var isHere = /^(127\.0\.0\.1|localhost|\[::1\])$/.test(location.hostname);
+    // 不是這台電腦：一定要用總控密碼登入，否則回到登入頁
+    var checkMaster = function () {
+      if (isHere) return;
+      fetch('/api/remote/me', { headers: PHONE_TOKEN ? { Authorization: 'Bearer ' + PHONE_TOKEN } : {} })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { if (j.role !== 'master') location.replace('/remote/?master=1'); })
+        .catch(function () { /* 連線中斷：等重新連線 */ });
+    };
+    checkMaster();
+    setInterval(checkMaster, 15000);
+  }
   if (MINI) { ui.page = 'flow'; ui.mode = 'show'; document.documentElement.classList.add('mini'); }
   function saveUi() { if (MINI) return; try { localStorage.setItem('fd-ui', JSON.stringify(ui)); } catch (e) { /* 忽略 */ } }
 
   var status = { conn: 'connecting', saved: true };
   var fd = FD.connect({
-    kind: MINI ? 'mini' : 'control',
+    kind: PHONE ? 'phone' : MINI ? 'mini' : 'control',
+    token: PHONE_TOKEN,
     onState: function (state, rev, reason, meta) {
       S = state;
       if (!D) return;
@@ -281,12 +301,16 @@
     if (MINI) {
       var top = !window.funk || !window.funk.miniOnTop || miniTop;
       add(headerEl, [
-        h('div', { class: 'brand', text: 'FUNKDATION' }, h('small', { text: '演出小面板' })),
+        h('div', { class: 'brand', text: 'FUNKDATION' }, h('small', { text: PHONE ? '總控' : '演出小面板' })),
         h('div', { class: 'spacer' }),
         window.funk && window.funk.miniOnTop ? h('button', { class: 'small' + (top ? ' on' : ''), title: '永遠顯示在其他視窗（OBS、Arena）上面', text: top ? '📌 置頂中' : '置頂', onclick: function () {
           miniTop = !miniTop; window.funk.miniOnTop(miniTop); renderHeader();
         } }) : null,
-        h('div', { class: 'status', id: 'status' })
+        h('div', { class: 'status', id: 'status' }),
+        PHONE ? h('button', { class: 'small', text: '登出', onclick: function () {
+          try { localStorage.removeItem('fd-remote-token'); localStorage.removeItem('fd-remote-role'); } catch (e) { /* 忽略 */ }
+          location.replace('/remote/?master=1');
+        } }) : null
       ]);
       renderStatus();
       return;
@@ -439,7 +463,7 @@
       var nx = nextCue();
       var lc = liveCue();
       add(col, h('div', { class: 'gobox' },
-        MINI ? h('div', { class: 'nowline' }, '播出中：', h('b', { text: lc ? FDM.cueTitle(S, lc) : '（尚未開始）' })) : null,
+        MINI ? h('div', { class: 'nowline', id: 'nowline' }, '播出中：', h('b', { text: lc ? FDM.cueTitle(S, lc) : '（尚未開始）' })) : null,
         h('button', { class: 'go', text: 'GO', title: '空白鍵', onclick: go }),
         h('div', { class: 'nextline', id: 'nextline' }, '下一個：', h('b', { text: nx ? FDM.cueTitle(S, nx) : '（已是最後一個）' })),
         h('div', { class: 'row' },
@@ -457,6 +481,19 @@
       },
       h('span', { class: 'no', text: String(i + 1).padStart(2, '0') }),
       h('div', null, h('div', { class: 't' }, FDM.cueTitle(S, c), h('span', { class: 'tag' })), h('div', { class: 's', text: FDM.cueSub(S, c) })),
+      PHONE ? h('div', { class: 'acts' }, h('button', { class: 'jump', text: '▶ 播', onclick: function (e) {
+        e.stopPropagation();
+        var b = e.currentTarget;
+        if (c.id === S.show.cueId) { toast('這個 Cue 正在播出'); return; }
+        // 手機上避免捲動時誤觸：按第一下變成「確定播？」，3 秒內再按一次才切換
+        if (!b.classList.contains('arm')) {
+          flowView.cuesCol.querySelectorAll('.jump.arm').forEach(function (x) { x.classList.remove('arm'); x.textContent = '▶ 播'; });
+          b.classList.add('arm'); b.textContent = '確定播？';
+          setTimeout(function () { if (b.isConnected) { b.classList.remove('arm'); b.textContent = '▶ 播'; } }, 3000);
+          return;
+        }
+        goTo(c.id);
+      } })) :
       h('div', { class: 'acts' },
         h('button', { class: 'ghost', text: '↑', title: '上移', onclick: function (e) { e.stopPropagation(); moveCue(i, -1); } }),
         h('button', { class: 'ghost', text: '↓', title: '下移', onclick: function (e) { e.stopPropagation(); moveCue(i, 1); } }),
@@ -492,6 +529,9 @@
       if (tag) tag.textContent = isLive ? (S.show.blackout ? '黑畫面' : '播出中') : isNext ? '下一個' : '';
       if (tag) tag.style.display = tag.textContent ? '' : 'none';
     });
+    // 播出中（小面板、手機版總控）：自己切換 Cue 時也要立刻更新
+    var nw = document.getElementById('nowline');
+    if (nw) { var lc2 = liveCue(); nw.innerHTML = ''; add(nw, ['播出中：', h('b', { text: lc2 ? FDM.cueTitle(S, lc2) : '（尚未開始）' })]); }
     var nl = document.getElementById('nextline');
     if (nl) { nl.innerHTML = ''; add(nl, ['下一個：', h('b', { text: nx ? FDM.cueTitle(S, nx) : '（已是最後一個）' })]); }
     var bb = document.getElementById('blackBtn');
@@ -708,7 +748,7 @@
   function showPanel(insp) {
     var c = liveCue();
     if (!c) {
-      add(insp, h('div', { class: 'live-head' }, h('h2', { text: '尚未開始播出' }), h('div', { class: 'muted', text: '按 GO 或空白鍵播出第一個 Cue，或在左側 Cue 上點兩下直接跳過去。' })));
+      add(insp, h('div', { class: 'live-head' }, h('h2', { text: '尚未開始播出' }), h('div', { class: 'muted', text: PHONE ? '按 GO 播出第一個 Cue，或在下方 Cue 列表按兩下「▶ 播」直接跳過去。' : '按 GO 或空白鍵播出第一個 Cue，或在左側 Cue 上點兩下直接跳過去。' })));
       return;
     }
     add(insp, h('div', { class: 'live-head' }, h('div', { class: 'faint', text: FDM.TYPES[c.type] + '・播出中' }), h('h2', { text: FDM.cueTitle(S, c) })));
@@ -1573,9 +1613,10 @@
       fetch('/api/remote/config').then(function (r) { return r.json(); }).then(function (c) {
         var pw = h('input', { type: 'text', value: c.password || '', placeholder: '至少 4 個字', maxlength: 32, autocomplete: 'off', style: 'width:180px' });
         var tpw = h('input', { type: 'text', value: c.timerPassword || '', placeholder: '選填，留空＝不開放', maxlength: 32, autocomplete: 'off', style: 'width:180px' });
+        var mpw = h('input', { type: 'text', value: c.masterPassword || '', placeholder: '選填，至少 6 個字', maxlength: 32, autocomplete: 'off', style: 'width:180px' });
         var en = h('input', { type: 'checkbox', checked: c.enabled });
         function saveCfg(msg) {
-          return post({ enabled: en.checked, password: pw.value, timerPassword: tpw.value }).then(function () { toast(msg); load(); })
+          return post({ enabled: en.checked, password: pw.value, timerPassword: tpw.value, masterPassword: mpw.value }).then(function () { toast(msg); load(); })
             .catch(function (e) { toast(e.message, true); if (en.checked && pw.value.trim().length < 4) { en.checked = false; } });
         }
         en.addEventListener('change', function () {
@@ -1603,17 +1644,25 @@
               if (v && v.length < 4) { toast('Timer 專用密碼至少 4 個字（不需要就留空）', true); return; }
               saveCfg(v ? '已更新 Timer 專用密碼' : '已關閉 Timer 專用密碼');
             } }),
-            h('span', { class: 'faint', text: '只能控制 Timer（給計時人員）' })),
+            h('span', { class: 'faint', text: '只能控制 Timer（給計時人員）' }),
+            h('span', { class: 'muted', text: '總控密碼' }), mpw,
+            h('button', { text: '儲存', onclick: function () {
+              var v = mpw.value.trim();
+              if (v && v.length < 6) { toast('總控密碼至少 6 個字（不需要就留空）', true); return; }
+              saveCfg(v ? '已更新總控密碼，手機版總控需要重新登入' : '已關閉手機版總控');
+            } }),
+            h('span', { class: 'faint', text: '手機版控台：切換所有 Cue 與演出操作（只給總控）' })),
           c.urls.length ? h('div', { class: 'qrs' }, c.urls.map(function (u, i) {
             var net = '網路：' + u.name + (u.virtual ? '（虛擬網卡，手機通常連不到）' : '');
             return h('div', { class: 'qrset' + (u.virtual ? ' virtual' : '') },
               c.enabled ? [qrItem(u.qr, u.url, '完整遙控', net), qrItem(u.timerQr, u.timerUrl, 'Timer 專用', net)] : null,
+              c.enabled && c.masterPassword ? qrItem(u.masterQr, u.masterUrl, '手機版總控', net) : null,
               qrItem(u.clockQr, u.clockUrl, '倒數顯示（不用密碼）', net));
           })) : h('div', { class: 'err', text: '這台電腦目前沒有連上任何網路，手機無法連線。請先連上 Wi-Fi 或手機熱點（不需要網際網路）。連上後這裡會自動出現 QR Code。' }),
           c.enabled ? [
             null,
             h('div', { class: 'btnrow', style: 'align-items:center' },
-              h('span', { class: 'muted', text: '已登入的裝置：' + c.devices + ' 台' + (c.timerDevices ? '（其中 Timer 專用 ' + c.timerDevices + ' 台）' : '') }),
+              h('span', { class: 'muted', text: '已登入的裝置：' + c.devices + ' 台' + (c.timerDevices || c.masterDevices ? '（' + [c.masterDevices ? '總控 ' + c.masterDevices + ' 台' : '', c.timerDevices ? 'Timer 專用 ' + c.timerDevices + ' 台' : ''].filter(Boolean).join('、') + '）' : '') }),
               h('button', { class: 'small', text: '登出所有裝置', onclick: function () { post({ logoutAll: true }).then(function () { toast('所有手機都已登出'); load(); }).catch(fail); } }),
               h('button', { class: 'small', text: '重新整理', onclick: load }))
           ] : null,
@@ -1621,6 +1670,7 @@
           h('div', { class: 'hint', html: '手機連上<b>和這台電腦同一個 Wi-Fi</b>，掃 QR Code 或輸入網址，再輸入密碼即可使用。' +
             '<br><b>倒數顯示</b>：只有大大的倒數數字，不用密碼也不能操作，適合放在舞台邊的平板或螢幕給舞者、MC 看（不用開啟遙控網頁也能用；點畫面可全螢幕）。' +
             '<br><b>完整遙控</b>：加減比分、選四強、控制 Timer。<b>Timer 專用</b>：只有倒數計時（開始／暫停、重置、秒數），用 Timer 專用密碼登入的人改不了比分。' +
+            '<br><b>手機版總控</b>：跟演出小面板一樣，GO、切換任何 Cue、回合、印章、Timer、揭曉、頒獎都能操作，畫面會跟著播出中的 Cue 換成對應的按鈕。只把總控密碼給總控本人；不能進入編排與設定。' +
             '<br>回合、印章、晉級與播放仍在控制台。換完整遙控密碼或關閉後，所有手機都要重新登入。' +
             '<br>Windows 第一次開啟時若跳出防火牆詢問，請允許「私人網路」，否則手機連不上。' })]);
       }).catch(function () { box.replaceChildren(h('div', { class: 'faint', text: '無法讀取遙控設定' })); });
@@ -1641,7 +1691,7 @@
   }
 
   // 目前連線中的畫面：每一個輸出畫面都會完整算一次動畫與影片，開太多會搶電腦資源（OBS／Arena 卡頓）
-  var KIND_NAMES = { obs: 'OBS 瀏覽器來源', window: '輸出視窗（本程式）', monitor: '控制台 LIVE／NEXT 監看', preview: '編排預覽', browser: '瀏覽器開的輸出畫面', control: '控制台', mini: '演出小面板', remote: '遙控網頁', timer: 'Timer 專用', clock: '倒數顯示', other: '其他' };
+  var KIND_NAMES = { obs: 'OBS 瀏覽器來源', window: '輸出視窗（本程式）', monitor: '控制台 LIVE／NEXT 監看', preview: '編排預覽', browser: '瀏覽器開的輸出畫面', control: '控制台', mini: '演出小面板', phone: '手機版總控', remote: '遙控網頁', timer: 'Timer 專用', clock: '倒數顯示', other: '其他' };
   var OUTPUT_KINDS = ['obs', 'window', 'monitor', 'preview', 'browser'];
   function clientsBox() {
     var box = h('div', { class: 'card clients' }, h('div', { class: 'faint', text: '讀取中…' }));

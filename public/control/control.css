@@ -242,3 +242,24 @@ table.grid input[type=text] { width: 100%; }
 .clients .crow { display: flex; justify-content: space-between; border-bottom: 1px dashed var(--line); padding: 3px 0; }
 .clients .tips { margin: 8px 0 4px; padding-left: 20px; color: var(--warn); line-height: 1.7; }
 .hint.warnline { color: var(--warn); }
+
+/* ---------- 手機版總控（?mini=1&phone=1） ---------- */
+.phone body, .phone { -webkit-text-size-adjust: 100%; }
+.phone header { position: sticky; top: 0; z-index: 10; }
+.phone header .brand small { color: var(--go-2); }
+.phone .flow { display: flex; flex-direction: column; height: auto; min-height: 0; overflow: visible; }
+.phone .col.cues { display: contents; }
+.phone .gobox { order: 1; position: sticky; top: 44px; z-index: 5; background: var(--bg); padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.phone .gobox .go { height: 72px; font-size: 30px; }
+.phone .col.insp { order: 2; overflow: visible; padding-bottom: 8px; }
+.phone .col.cues .cuelist { display: block; order: 3; max-height: none; overflow: visible; border-top: 1px solid var(--line); padding: 8px 10px 40px; }
+.phone .col.cues .cuelist::before { content: '全部 Cue（按 ▶ 播 兩下切換）'; display: block; font-size: 12px; color: var(--muted); letter-spacing: .06em; margin: 4px 2px 8px; }
+.phone .cue { padding: 10px 8px; }
+.phone .cue .acts { display: flex; }
+.phone .cue .jump { min-width: 78px; height: 40px; border-radius: 10px; font-weight: 700; }
+.phone .cue .jump.arm { background: var(--accent); border-color: var(--accent); color: #fff; }
+.phone .cue.live .jump { opacity: .35; }
+.phone button { min-height: 40px; }
+.phone #app { height: auto; min-height: 100%; }
+.phone main { overflow: visible; }
+.phone .cue .acts { opacity: 1; }

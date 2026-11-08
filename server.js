@@ -44,6 +44,12 @@ const remote = createRemote({
   }
 });
 app.use(remote.gate);
+// 換密碼、關閉遙控或登出時：已連線的手機版總控立刻失去操作權並斷線
+remote.onAuthChange(() => {
+  for (const c of wss.clients) {
+    if (!c.readOnly && c.remote && remote.roleOfToken(c.token) !== 'master') { c.readOnly = true; try { c.close(4001, 'auth'); } catch { /* 已關閉 */ } }
+  }
+});
 remote.routes(app);
 
 app.get('/', (req, res) => res.redirect('/control/'));
@@ -198,10 +204,13 @@ store.on('error-log', e => log('錯誤', e.message));
 
 wss.on('connection', (ws, req) => {
   ws.isAlive = true;
-  // 其他裝置（遙控網頁、另一台電腦的輸出畫面）只能讀取，修改一律走遙控指令
-  ws.readOnly = !isLocal(req);
-  // 這是哪一種畫面（設定頁用來顯示目前開著幾個輸出畫面，排查卡頓）
-  try { ws.kind = new URL(req.url, 'http://x').searchParams.get('kind') || 'other'; } catch { ws.kind = 'other'; }
+  // 其他裝置（遙控網頁、另一台電腦的輸出畫面）只能讀取，修改一律走遙控指令；
+  // 例外：用總控密碼登入的手機版控台，可以跟控制台一樣操作
+  let q = null;
+  try { q = new URL(req.url, 'http://x').searchParams; } catch { q = new URLSearchParams(); }
+  ws.kind = q.get('kind') || 'other';
+  ws.token = q.get('token') || '';
+  ws.readOnly = !isLocal(req) && remote.roleOfToken(ws.token) !== 'master';
   ws.remote = !isLocal(req);
   ws.on('pong', () => { ws.isAlive = true; });
   ws.send(JSON.stringify({ type: 'hello', rev: store.rev, savedRev: store.savedRev, state: store.state, serverTime: Date.now() }));

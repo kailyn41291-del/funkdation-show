@@ -107,7 +107,7 @@
       return i >= 0;
     }
     // kind：告訴伺服器這是哪一種畫面（OBS、輸出視窗、監看、遙控…），設定頁會列出目前開著幾個
-    var wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws' + (opts.kind ? '?kind=' + encodeURIComponent(opts.kind) : '');
+    var wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?kind=' + encodeURIComponent(opts.kind || 'other') + (opts.token ? '&token=' + encodeURIComponent(opts.token) : '');
 
     function setStatus(s) {
       if (api.status === s) return;

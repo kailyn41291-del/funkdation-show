@@ -10,6 +10,9 @@
   var token = load(KEY);
   // Timer 專用：網址 /timer（= /remote/?timer=1），或用 Timer 專用密碼登入
   var TIMER_URL = /[?&]timer=1/.test(location.search);
+  // 總控：網址 /master（= /remote/?master=1），用總控密碼登入後進入手機版控台
+  var MASTER_URL = /[?&]master=1/.test(location.search);
+  function toConsole() { location.replace('/control/?mini=1&phone=1'); }
   var role = load('fd-remote-role') || 'full';
   function timerOnly() { return TIMER_URL || role === 'timer'; }
   if (TIMER_URL) document.title = 'FUNKDATION Timer';
@@ -70,12 +73,14 @@
       api('/api/remote/login', { password: input.value }).then(function (j) {
         token = j.token; save(KEY, token);
         role = j.role || 'full'; save('fd-remote-role', role);
+        if (role === 'master') { toConsole(); return; }
+        if (MASTER_URL) { err.textContent = '這組密碼不是總控密碼。'; btn.disabled = false; return; }
         start();
       }).catch(function (e2) { err.textContent = e2.message; btn.disabled = false; input.select(); });
     } },
-      h('div', { class: 'brand', text: 'FUNKDATION' }, h('small', { text: TIMER_URL ? 'Timer' : '遙控' })),
-      h('h1', { text: TIMER_URL ? 'Timer 控制' : '比分遙控' }),
-      h('p', { text: (TIMER_URL ? '輸入「Timer 專用密碼」或完整遙控密碼。' : '輸入控制台「設定 → 遙控網頁」顯示的密碼。') + '手機要和播出電腦連同一個 Wi-Fi。' }),
+      h('div', { class: 'brand', text: 'FUNKDATION' }, h('small', { text: MASTER_URL ? '總控' : TIMER_URL ? 'Timer' : '遙控' })),
+      h('h1', { text: MASTER_URL ? '手機版總控' : TIMER_URL ? 'Timer 控制' : '比分遙控' }),
+      h('p', { text: (MASTER_URL ? '輸入「總控密碼」。登入後可以切換所有 Cue 與演出操作。' : TIMER_URL ? '輸入「Timer 專用密碼」或完整遙控密碼。' : '輸入控制台「設定 → 遙控網頁」顯示的密碼。') + '手機要和播出電腦連同一個 Wi-Fi。' }),
       input, btn, err);
     app.replaceChildren(h('div', { class: 'login' }, form));
     setTimeout(function () { input.focus(); }, 50);
@@ -292,6 +297,11 @@
   }
 
   if (!token) loginView('');
-  else api('/api/remote/me').then(function (j) { role = j.role || 'full'; save('fd-remote-role', role); start(); })
+  else api('/api/remote/me').then(function (j) {
+    role = j.role || 'full'; save('fd-remote-role', role);
+    if (role === 'master') { toConsole(); return; }
+    if (MASTER_URL) { loginView(''); return; }
+    start();
+  })
     .catch(function (e) { if (e.message) loginView(e.message); });
 })();
