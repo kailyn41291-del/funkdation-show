@@ -322,6 +322,8 @@
     var sc = baseScene(ctx);
     var band = mk('div', 'band', sc.root);
     var track = mk('div', 'track', band);
+    // 先隱藏，等登場動畫再淡入；不然切進來的頭兩格會先整條跳出來再消失（看起來像閃一下）
+    FX.hide(band);
     var sig = null, half = 0, off = 0, last = performance.now();
     function measure() { half = track.scrollWidth / 3; }
     function build() {
