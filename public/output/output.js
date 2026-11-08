@@ -326,8 +326,22 @@
     var track = mk('div', 'track', band);
     // 先隱藏，等登場動畫再淡入；不然切進來的頭兩格會先整條跳出來再消失（看起來像閃一下）
     FX.hide(band);
-    var sig = null, half = 0, off = 0, last = performance.now();
-    function measure() { half = track.scrollWidth / 3; }
+    // 跑馬燈交給瀏覽器的合成器跑（不用每格執行程式），主執行緒忙的時候也不會卡頓
+    var sig = null, half = 0, anim = null, animSig = '';
+    function measure() { half = track.scrollWidth / 3; restartAnim(); }
+    function restartAnim() {
+      var sp = S.sponsors, speed = Math.max(1, Number(sp.speed) || 60), dir = (sp.direction || -1) < 0 ? -1 : 1;
+      if (!(half > 0)) return;
+      var key = half.toFixed(1) + '|' + speed + '|' + dir;
+      if (key === animSig && anim) return;
+      animSig = key;
+      var dur = half / speed * 1000, phase = anim ? (Number(anim.currentTime) || 0) / ((anim.effect.getTiming().duration) || dur) : 0;
+      if (anim) anim.cancel();
+      var a = dir < 0 ? 0 : -half, b = dir < 0 ? -half : 0;
+      anim = track.animate([{ transform: 'translate3d(' + a + 'px,0,0)' }, { transform: 'translate3d(' + b + 'px,0,0)' }], { duration: dur, iterations: Infinity, easing: 'linear' });
+      anim.currentTime = (phase % 1) * dur;   // 改速度時接續目前位置
+      if (STILL) anim.pause();
+    }
     function build() {
       var sp = S.sponsors;
       var s = JSON.stringify([sp.logos, sp.height, sp.gap, sp.color]);
@@ -356,19 +370,8 @@
       px(band, { height: bh, top: sp.y - bh / 2 });
       band.style.background = sp.band === 'dark' ? 'rgba(20,7,7,.85)' : sp.band === 'cream' ? 'rgba(236,224,200,.92)' : 'transparent';
       build();
+      restartAnim();
     };
-    function tick(t) {
-      var dt = Math.min(0.1, (t - last) / 1000);
-      last = t;
-      if (half > 0) {
-        off += (S.sponsors.direction || -1) * S.sponsors.speed * dt;
-        if (off <= -half) off += half;
-        if (off > 0) off -= half;
-        track.style.transform = 'translate3d(' + off.toFixed(2) + 'px,0,0)';
-      }
-      sc.loop = requestAnimationFrame(tick);
-    }
-    sc.loop = requestAnimationFrame(tick);
     sc.showStatic = function () { FX.show(band); };
     sc.enter = function () { FX.run(band, effectsOn ? 'fade' : 'none', Math.max(300, Number(sc.ctx.layout.fade) || 600), sc.tl); };
     sc.update(ctx);
@@ -1242,7 +1245,25 @@
   }
 
   // ---------- 連線 ----------
+  // ---------- 效能檢查（網址加 ?fps=1）：左上角顯示每秒畫格數與最近 10 秒掉了幾格 ----------
+  if (params.get('fps') === '1') {
+    var meter = mk('div', 'fpsmeter', document.body), frames = [], drops = [];
+    (function loop(t) {
+      if (frames.length) { var gap = t - frames[frames.length - 1]; if (gap > 1000 / 60 * 1.6) drops.push(t); }
+      frames.push(t);
+      while (frames.length && t - frames[0] > 1000) frames.shift();
+      while (drops.length && t - drops[0] > 10000) drops.shift();
+      requestAnimationFrame(loop);
+    })(performance.now());
+    setInterval(function () {
+      meter.textContent = frames.length + ' fps　掉格 ' + drops.length + '（10 秒內）　' + innerWidth + '×' + innerHeight + (window.obsstudio ? '　OBS' : '');
+      meter.className = 'fpsmeter' + (frames.length < 50 || drops.length > 5 ? ' bad' : '');
+    }, 500);
+  }
+
+  var KIND = window.obsstudio ? 'obs' : MONITOR ? (params.get('monitor') === '1' || STILL ? 'monitor' : 'preview') : /Electron/i.test(navigator.userAgent) ? 'window' : 'browser';
   var fd = window.fd = FD.connect({
+    kind: KIND,
     onState: function (state, rev, reason, meta) {
       S = state;
       document.getElementById('offline').style.display = 'none';

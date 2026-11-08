@@ -237,3 +237,8 @@ table.grid input[type=text] { width: 100%; }
 .remote .qrset { display: flex; gap: 16px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
 .remote .qrset.virtual { opacity: .55; }
 .remote .qnet { font-size: 11px; max-width: 200px; text-align: center; }
+
+.clients .crows { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 18px; }
+.clients .crow { display: flex; justify-content: space-between; border-bottom: 1px dashed var(--line); padding: 3px 0; }
+.clients .tips { margin: 8px 0 4px; padding-left: 20px; color: var(--warn); line-height: 1.7; }
+.hint.warnline { color: var(--warn); }

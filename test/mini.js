@@ -95,7 +95,7 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
     sleep(200).then(() => ops([{ op: 'set', path: ['show', 'cueId'], value: 'c-open' }, { op: 'set', path: ['show', 'seq'], value: 20 }]))
   ]);
   check('切換過程每一格底圖覆蓋 100%', m2[0] > 0.999, 'min ' + m2[0].toFixed(3));
-  await sleep(800);
+  await sleep(2500);   // 主視覺待機預設淡入 1.2 秒，舊底圖淡入完成後才收掉
   const bg = await out.evaluate(() => { const on = [...document.querySelectorAll('.bg.on')]; return on.map(e => getComputedStyle(e).backgroundColor); });
   check('切換完成後只剩新底圖', bg.length === 1 && bg[0] === 'rgb(58, 110, 165)', bg.join(', '));
   check('沒有錯誤訊息', errors.length === 0, errors.join(' | '));

@@ -60,6 +60,18 @@ app.use('/assets', express.static(store.assetsDir, { maxAge: 0 }));
 app.get('/api/state', (req, res) => res.json(store.snapshot()));
 app.get('/api/defaults', (req, res) => res.json(require('./default-state').defaultState()));
 
+// 目前連線中的畫面（只有這台電腦能看）
+app.get('/api/clients', (req, res) => {
+  if (!isLocal(req)) return res.status(403).end();
+  const counts = {};
+  for (const c of wss.clients) {
+    if (c.readyState !== 1) continue;
+    const k = c.kind + (c.remote ? '@lan' : '');
+    counts[k] = (counts[k] || 0) + 1;
+  }
+  res.json({ counts });
+});
+
 app.get('/api/info', (req, res) => {
   res.json({ rev: store.rev, savedRev: store.savedRev, loadedFrom: store.loadedFrom, serverTime: Date.now(), addresses: lanAddresses() });
 });
@@ -188,6 +200,9 @@ wss.on('connection', (ws, req) => {
   ws.isAlive = true;
   // 其他裝置（遙控網頁、另一台電腦的輸出畫面）只能讀取，修改一律走遙控指令
   ws.readOnly = !isLocal(req);
+  // 這是哪一種畫面（設定頁用來顯示目前開著幾個輸出畫面，排查卡頓）
+  try { ws.kind = new URL(req.url, 'http://x').searchParams.get('kind') || 'other'; } catch { ws.kind = 'other'; }
+  ws.remote = !isLocal(req);
   ws.on('pong', () => { ws.isAlive = true; });
   ws.send(JSON.stringify({ type: 'hello', rev: store.rev, savedRev: store.savedRev, state: store.state, serverTime: Date.now() }));
   ws.on('message', data => {

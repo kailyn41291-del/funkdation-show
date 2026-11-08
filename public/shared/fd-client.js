@@ -106,7 +106,8 @@
       if (i >= 0) inflight.splice(0, i + 1); // 伺服器依序處理，之前的也都已確認
       return i >= 0;
     }
-    var wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+    // kind：告訴伺服器這是哪一種畫面（OBS、輸出視窗、監看、遙控…），設定頁會列出目前開著幾個
+    var wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws' + (opts.kind ? '?kind=' + encodeURIComponent(opts.kind) : '');
 
     function setStatus(s) {
       if (api.status === s) return;

@@ -66,3 +66,7 @@ body.monitor #offline { display: none !important; }
 /* OBS 尺寸不足提醒 */
 .obswarn { position: fixed; left: 2%; top: 3%; z-index: 99; max-width: 70%; padding: 2.2vh 2.6vh; border-radius: 1vh; background: #ffd23f; color: #1a0f00; font: 700 2.8vh/1.5 'Noto Serif TC', sans-serif; box-shadow: 0 0 0 .5vh #1a0f00; cursor: default; }
 .obswarn .h { display: block; font-size: 3.4vh; margin-bottom: .6vh; }
+
+/* 效能檢查（?fps=1） */
+.fpsmeter { position: fixed; left: 10px; top: 10px; z-index: 100; padding: 6px 10px; border-radius: 6px; background: rgba(0,0,0,.75); color: #7dff9a; font: 600 16px/1.2 ui-monospace, Menlo, Consolas, monospace; pointer-events: none; }
+.fpsmeter.bad { color: #ff8a7a; }

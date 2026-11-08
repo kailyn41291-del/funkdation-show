@@ -270,6 +270,7 @@
     render();
     if (fd) return;
     var me = FD.connect({
+      kind: timerOnly() ? 'timer' : 'remote',
       // 登出後舊連線的通知（例如關閉時的 offline）一律忽略，不要蓋掉登入畫面
       onState: function (state) { if (fd !== me) return; S = state; renderSoon(); },
       onStatus: function (s) { if (fd !== me) return; status = s; renderSoon(); }

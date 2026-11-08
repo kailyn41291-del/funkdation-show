@@ -57,6 +57,7 @@
 
   var status = { conn: 'connecting', saved: true };
   var fd = FD.connect({
+    kind: MINI ? 'mini' : 'control',
     onState: function (state, rev, reason, meta) {
       S = state;
       if (!D) return;
@@ -394,12 +395,20 @@
       flowView.previewMon.frame.addEventListener('load', function () { sendGuides(); });
     } else if (MINI) {
       // 小面板不放監看畫面（省資源）；看畫面請看 OBS／Arena
+    } else if (ui.noMonitors) {
+      // 監看畫面關閉：省下兩個完整輸出畫面的運算（OBS／Arena 卡頓時使用）
+      add(center, [h('div', { class: 'card', style: 'text-align:center;padding:28px' },
+        h('div', { style: 'font-weight:700;margin-bottom:6px', text: '監看畫面已關閉（省效能）' }),
+        h('div', { class: 'muted', style: 'margin-bottom:14px', text: '請看 OBS／Arena 的畫面。操作都在左右兩邊，跟平常一樣。' }),
+        h('button', { text: '開啟監看畫面', onclick: function () { ui.noMonitors = false; saveUi(); renderPage(false); } })),
+        h('div', { class: 'hint', html: shortcutHelp() })]);
     } else {
       var nx = nextCue();
       flowView.liveMon = monitor('/output/?monitor=1', 'LIVE 播出中', 'live');
       flowView.nextMon = monitor('/output/?still=1&preview=' + encodeURIComponent(nx ? nx.id : ''), 'NEXT 下一個', 'next');
       flowView.nextId = nx ? nx.id : null;
-      add(center, [flowView.liveMon.el, h('div', { class: 'monrow' }, h('div', { class: 'hint', html: shortcutHelp() }), flowView.nextMon.el)]);
+      add(center, [flowView.liveMon.el, h('div', { class: 'monrow' }, h('div', { class: 'hint', html: shortcutHelp() }), flowView.nextMon.el),
+        h('div', { class: 'btnrow' }, h('button', { class: 'small', text: '關閉監看畫面（省效能）', title: '電腦同時跑 OBS／Arena 卡頓時，關掉 LIVE／NEXT 監看可以省下兩個完整畫面的運算', onclick: function () { ui.noMonitors = true; saveUi(); renderPage(false); } }))]);
     }
     renderCueList();
     renderInspector();
@@ -1631,6 +1640,38 @@
     return box;
   }
 
+  // 目前連線中的畫面：每一個輸出畫面都會完整算一次動畫與影片，開太多會搶電腦資源（OBS／Arena 卡頓）
+  var KIND_NAMES = { obs: 'OBS 瀏覽器來源', window: '輸出視窗（本程式）', monitor: '控制台 LIVE／NEXT 監看', preview: '編排預覽', browser: '瀏覽器開的輸出畫面', control: '控制台', mini: '演出小面板', remote: '遙控網頁', timer: 'Timer 專用', clock: '倒數顯示', other: '其他' };
+  var OUTPUT_KINDS = ['obs', 'window', 'monitor', 'preview', 'browser'];
+  function clientsBox() {
+    var box = h('div', { class: 'card clients' }, h('div', { class: 'faint', text: '讀取中…' }));
+    function load() {
+      if (!document.body.contains(box) && box.dataset.loaded) return;
+      fetch('/api/clients').then(function (r) { return r.json(); }).then(function (r) {
+        box.dataset.loaded = '1';
+        var c = r.counts || {}, rows = [], outputs = 0, obs = 0;
+        Object.keys(c).sort().forEach(function (k) {
+          var base = k.replace('@lan', ''), lan = k !== base;
+          if (OUTPUT_KINDS.indexOf(base) >= 0) outputs += c[k];
+          if (base === 'obs') obs += c[k];
+          rows.push(h('div', { class: 'crow' }, h('span', { text: (KIND_NAMES[base] || base) + (lan ? '（其他裝置）' : '') }), h('b', { text: c[k] + ' 個' })));
+        });
+        var tips = [];
+        if (obs > 1) tips.push('OBS 裡有 ' + obs + ' 個瀏覽器來源同時在跑。不同場景請用「加入現有來源」共用同一個，不要各自新增，否則會重複運算。');
+        if (obs && c.window) tips.push('已經用 OBS 輸出時，「輸出視窗」通常可以關掉（選單「輸出 → 關閉輸出視窗」）。');
+        if (obs && c.monitor) tips.push('演出時可以在流程頁按「關閉監看畫面」，或改用「演出小面板」，省下兩個完整畫面的運算。');
+        box.innerHTML = '';
+        add(box, [h('div', { class: 'crows' }, rows.length ? rows : h('span', { class: 'faint', text: '沒有連線中的畫面' })),
+          h('div', { class: outputs > 2 ? 'hint warnline' : 'hint', text: '同時在運算的輸出畫面：' + outputs + ' 個' + (outputs > 2 ? '（偏多，可能造成卡頓）' : '') }),
+          tips.length ? h('ul', { class: 'tips' }, tips.map(function (t) { return h('li', { text: t }); })) : null,
+          h('div', { class: 'hint', html: '想確認畫面本身有沒有掉格：把 OBS 瀏覽器來源的網址改成 <code>http://localhost:' + (location.port || '80') + '/output/?fps=1</code>，左上角會顯示每秒畫格數與掉格次數（檢查完再改回來）。' })]);
+      }).catch(function () {});
+    }
+    load();
+    var t = setInterval(function () { if (!document.body.contains(box)) { clearInterval(t); return; } load(); }, 3000);
+    return box;
+  }
+
   function pageSettings(page) {
     var wrap = h('div', { class: 'pagewrap', style: 'max-width:860px' });
     page.appendChild(wrap);
@@ -1648,6 +1689,7 @@
           h('li', { text: '勾選「透過 OBS 控制音訊」可以在 OBS 混音；要透明疊加時把底圖模式設為「透明」' })),
         h('div', { class: 'hint', text: '尺寸沒設對時，OBS 畫面左上角會出現黃色提醒，改好就會自動消失。' }),
         h('div', { id: 'lan', class: 'hint' })),
+      h('h3', { text: '目前開著的畫面（卡頓時檢查）' }), clientsBox(),
       h('h3', { text: '遙控網頁（手機加減分、選四強、Timer）' }), remoteBox(),
       h('h3', { text: '備份與還原' }),
       h('div', { class: 'hint', text: '每次修改都會立即存檔，另外每 5 分鐘自動備份一份（保留最近 20 份）。' }),

@@ -36,6 +36,7 @@
   'use strict';
   var el = document.getElementById('t'), S = null, last = '';
   var fd = FD.connect({
+    kind: 'clock',
     onState: function (s) { S = s; },
     onStatus: function (st) { document.body.classList.toggle('offline', st !== 'online'); }
   });
