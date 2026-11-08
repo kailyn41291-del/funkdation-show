@@ -808,15 +808,85 @@
     var tlab = mk('div', 'en ls-lab gm', tmIn), tm = mk('div', 'en ls-tm gm', tmIn);
     tlab.textContent = 'TIME';
     tm.style.display = 'inline-block';
+    // 回合稱號（先鋒、策應…，書法字）與這回合兩隊上場的舞者名字
+    // 左右兩隊各一個：直式書法字，或該回合上傳的 PNG（有圖用圖）；名字在稱號正下方
+    function RT() {
+      var tW = mk('div', 'txt zh rv', sc.root), tT = mk('span', 't rtitle', tW);
+      var iW = mk('div', 'txt rimgw', sc.root), iT = mk('img', 't rimg', iW);
+      iT.alt = '';
+      var nm = Txt(sc.root, 'zh');
+      nm.t.classList.add('rname');
+      return { tW: tW, tT: tT, iW: iW, iT: iT, nm: nm };
+    }
+    var rtA = RT(), rtB = RT(), nmL = rtA.nm, nmR = rtB.nm;
     var sealL = mk('div', 'seal', sc.root), sealR = mk('div', 'seal', sc.root);
     var sealImgL = mk('img', '', sealL), sealImgR = mk('img', '', sealR);
     var SEAL = { l: sealL, r: sealR };
     var shownScore = { l: null, r: null }, shownSeal = null, shownRound = null;
     var GROUPS = {
       fr: [[pL.fr], [pR.fr]], ph: [[pL.ph], [pR.ph]],
-      nm: [[enL.t, zhL.t], [enR.t, zhR.t]], info: [[hIn, sL, sR, dv, tmIn]]
+      nm: [[enL.t, zhL.t], [enR.t, zhR.t]], info: [[hIn, sL, sR, dv, tmIn]],
+      rt: [[rtA.tT, rtA.iT, rtB.tT, rtB.iT, nmL.t, nmR.t]]
     };
-    var ORDER = ['fr', 'ph', 'nm', 'info'];
+    var ORDER = ['fr', 'ph', 'nm', 'info', 'rt'];
+    function brushFont(name) { return "'" + String(name || 'FD Potta One').replace(/'/g, '') + "', var(--fzh)"; }
+    function inkOf(c) { return c === 'light' ? 'var(--light)' : c === 'ink' || !c ? 'var(--ink)' : c; }
+    // 依回合放稱號：左右兩隊外側各一個（直式或橫式），名字在稱號正下方
+    var rtGen = 0;
+    function roundTexts(round) {
+      var L = sc.ctx.layout, v = L.v, rt = L.rt || {};
+      var info = FDM.roundInfo(S, sc.ctx.cue.battle, round);
+      var on = rt.on !== false, gen = ++rtGen;
+      [rtA.tW, rtA.iW, rtB.tW, rtB.iW, nmL.wrap, nmR.wrap].forEach(function (el) { el.style.display = on ? '' : 'none'; });
+      if (!on) return;
+      var src = info.img ? asset(info.img) : '';
+      var rx = v.rx || 810, ry = v.ry || 440, rs = v.rs || 150, rh = v.rh || 360, rw = v.rw || 260, ng = v.ng == null ? 28 : v.ng;
+      var vert = rt.dir !== 'h', col = inkOf(rt.color);
+      var nf = rt.nameFont === 'title' ? 'var(--fen)' : brushFont(rt.font);
+      nmL.t.style.fontFamily = nmR.t.style.fontFamily = nf;
+      nmL.t.style.color = nmR.t.style.color = col;
+      nmL.text(info.l); nmR.text(info.r);
+      var heights = [];
+      function place(o, cx, done) {
+        o.tW.style.display = src ? 'none' : '';
+        o.iW.style.display = src ? '' : 'none';
+        if (src) {
+          if (o.iT.getAttribute('src') !== src) o.iT.src = src;
+          var fit = function () {
+            if (gen !== rtGen) return;
+            var nw = o.iT.naturalWidth || rh, nh = o.iT.naturalHeight || rh, k = rh / nh; // 圖片大小只看高度（「大小」滑桿）
+            px(o.iT, { width: nw * k, height: nh * k });
+            px(o.iW, { left: cx, top: ry - nh * k / 2 });
+            done(nh * k);
+          };
+          if (o.iT.complete && o.iT.naturalWidth) fit(); else o.iT.onload = fit;
+          return;
+        }
+        o.tW.classList.toggle('rv', vert);
+        o.tT.style.fontFamily = brushFont(rt.font);
+        o.tT.style.color = col;
+        if (o.tT.textContent !== info.title) o.tT.textContent = info.title;
+        px(o.tW, { left: cx, fontSize: rs });
+        // 太長就縮小：直式限制高度、橫式限制寬度
+        var lim = vert ? rh : rw, size = vert ? o.tT.offsetHeight : o.tT.offsetWidth;
+        if (size > lim) px(o.tW, { fontSize: rs * lim / size });
+        var hh = o.tT.offsetHeight;
+        px(o.tW, { top: ry - hh / 2 });
+        done(hh);
+      }
+      function names() {
+        if (heights.length < 2) return;
+        var y = ry + Math.max(heights[0], heights[1]) / 2 + ng;
+        // 各自縮放（長名字只縮自己），中心對齊同一條線
+        var ns = v.ns || 52;
+        [[nmL, W / 2 - rx], [nmR, W / 2 + rx]].forEach(function (o) {
+          var got = o[0].at(o[1], y, ns, rw);
+          px(o[0].wrap, { top: y + (ns - got) / 2 });
+        });
+      }
+      place(rtA, W / 2 - rx, function (hh) { heights[0] = hh; names(); });
+      place(rtB, W / 2 + rx, function (hh) { heights[1] = hh; names(); });
+    }
 
     function B() { return S.results.battles[sc.ctx.cue.battle] || { l: 0, r: 0, round: 1, seal: null }; }
     function side(src) {
@@ -884,6 +954,7 @@
       });
       var b = B();
       if (shownRound !== b.round) { shownRound = b.round; headers(b.round); }
+      roundTexts(b.round);
       ['l', 'r'].forEach(function (k) {
         if (shownScore[k] !== b[k]) { shownScore[k] = b[k]; (k === 'l' ? sL : sR).textContent = b[k]; }
       });
@@ -975,6 +1046,15 @@
       else if (ev.name === 'round') {
         shownRound = ev.round;
         headers(ev.round);
+        // 回合稱號與名字：換成新回合的字，用墨跡（動畫分頁「回合稱號」）重新登場
+        roundTexts(ev.round);
+        var rs = sc.ctx.layout.anim.steps.rt || { fx: 'ink' }, rd = Math.max(300, sc.ctx.layout.anim.duration || 500);
+        [rtA.tT, rtA.iT, rtB.tT, rtB.iT, nmL.t, nmR.t].forEach(function (el, i) {
+          if (!effectsOn) { FX.show(el); return; }
+          FX.hide(el);
+          var id = setTimeout(function () { FX.run(el, rs.fx || 'ink', rd, sc.tl); }, i < 4 ? 0 : 200);
+          sc.tl.timers.push(id);
+        });
         // 回合數與中文標題（四強賽／決賽）一起淡入，英文大標題 FINAL／SEMI FINAL 不動
         if (effectsOn) [h2, h3].forEach(function (el) { el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600 }); });
         if (shownSeal) { if (sc.ctx.layout.seal.autoFade) fadeSeal(); else { FX.hide(SEAL.l); FX.hide(SEAL.r); shownSeal = null; } }
@@ -1268,8 +1348,20 @@
       if (L && L.seal) texts.push(L.seal.text);
     }
     texts.push('TIME ROUND VS 0123456789: 第一二三四五六七八九十回合');
-    var all = texts.filter(Boolean).join(' ');
-    sig = all + '|' + ev.fontEn + '|' + ev.fontZh;
+    // 回合稱號與舞者名字（書法字型）
+    var rtL = S.layouts.battle && S.layouts.battle.rt, brush = [];
+    if (rtL) brush = brush.concat(rtL.titles || []);
+    if (rtL) (rtL.images || []).forEach(function (src) {
+      if (!src || preloaded['rt:' + src]) return;
+      var im = new Image();
+      im.src = asset(src);
+      if (im.decode) im.decode().catch(function () {});
+      preloaded['rt:' + src] = im;
+    });
+    for (var bk in S.results.battles) { var nb = S.results.battles[bk].names || {}; brush = brush.concat(nb.l || [], nb.r || []); }
+    var brushAll = brush.filter(Boolean).join(' ');
+    var all = texts.filter(Boolean).join(' ') + ' ' + brushAll;
+    sig = all + '|' + ev.fontEn + '|' + ev.fontZh + '|' + (rtL && rtL.font);
     if (sig === warmSig) return;
     warmSig = sig;
     var idle = window.requestIdleCallback || function (f) { return setTimeout(f, 200); };
@@ -1286,6 +1378,7 @@
       document.fonts.load('900 64px "' + (ev.fontEn || 'Cinzel') + '"', all).catch(function () {});
       document.fonts.load('900 64px "' + (ev.fontZh || 'Noto Serif TC') + '"', all).catch(function () {});
       document.fonts.load('700 64px "' + (ev.fontEn || 'Cinzel') + '"', all).catch(function () {});
+      if (rtL && brushAll) document.fonts.load('400 64px "' + String(rtL.font || 'FD Potta One').replace(/"/g, '') + '"', brushAll).catch(function () {});
     }
     idle(function () {
       for (var k in S.layouts) {

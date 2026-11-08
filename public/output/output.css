@@ -70,3 +70,12 @@ body.monitor #offline { display: none !important; }
 /* 效能檢查（?fps=1） */
 .fpsmeter { position: fixed; left: 10px; top: 10px; z-index: 100; padding: 6px 10px; border-radius: 6px; background: rgba(0,0,0,.75); color: #7dff9a; font: 600 16px/1.2 ui-monospace, Menlo, Consolas, monospace; pointer-events: none; }
 .fpsmeter.bad { color: #ff8a7a; }
+
+/* 回合稱號（書法）與舞者名字 */
+.rtitle { line-height: 1; letter-spacing: .04em; padding-left: .04em; white-space: nowrap; }
+.rv .rtitle { writing-mode: vertical-rl; text-orientation: upright; padding-left: 0; padding-top: .04em; }
+.rimgw { line-height: 0; }
+.rimg { display: block; }
+.rname { line-height: 1; letter-spacing: .06em; padding-left: .06em; white-space: nowrap; }
+/* 書法大字的紙紋顆粒用固定大小（跟著字級放大會變成大斑點） */
+.grain .rtitle, .grain .rname, .grain .rimg { -webkit-mask-size: 150px 150px; mask-size: 150px 150px; }

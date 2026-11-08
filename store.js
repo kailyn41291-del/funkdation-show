@@ -26,7 +26,15 @@ function migrate(state) {
   if ((state.schema || 0) < 3) migrate3(state);
   if ((state.schema || 0) < 4) migrate4(state);
   if ((state.schema || 0) < 5) migrate5(state);
+  if ((state.schema || 0) < 6) migrate6(state);
   return state;
+}
+// schema 6：四強改成 5 回合（先鋒、策應、中樞、副將、主將）
+function migrate6(state) {
+  for (const c of state.cues || []) {
+    if (c.type === 'battle' && (c.battle === 'semi1' || c.battle === 'semi2') && c.rounds === 4) c.rounds = 5;
+  }
+  state.schema = 6;
 }
 // schema 5：「評審討論」Cue 演出時可以先選四強
 function migrate5(state) {

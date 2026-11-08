@@ -34,7 +34,8 @@ const step = (fx) => ({ fx, dur: 0, extra: 0 });
 const bg = () => ({ mode: 'color', color: '#8b2420', src: null, sound: false, texture: true });
 
 function emptyBattle() {
-  return { l: 0, r: 0, round: 1, seal: null, winner: null, hist: [] };
+  // names：每回合上場的舞者名字（l／r 各一個陣列，第 n 回合在 [n-1]），沒填就只顯示回合稱號
+  return { l: 0, r: 0, round: 1, seal: null, winner: null, hist: [], names: { l: [], r: [] } };
 }
 
 function personLayout(text) {
@@ -89,10 +90,13 @@ function defaultLayouts() {
         hy: 170, hs: 34, hg: 60,
         ty: 700, ts: 64,
         es: 46, zs: 26, ng: 30,
-        gs: 150, gx: -20, gy: -50, ga: -6
+        gs: 150, gx: -20, gy: -50, ga: -6,
+        rx: 810, ry: 440, rs: 150, rh: 400, rw: 270, ns: 52, ng: 28
       },
+      // 回合稱號：依回合顯示（書法字），有填舞者名字時在兩隊下方顯示名字
+      rt: { on: true, titles: ['先鋒', '策應', '中樞', '副將', '主將'], images: ['builtin/round-1.png', 'builtin/round-2.png', 'builtin/round-3.png', 'builtin/round-4.png', 'builtin/round-5.png'], dir: 'v', font: 'FD Potta One', color: 'ink', nameFont: 'brush' },
       divider: true,
-      anim: { duration: 500, overlap: 60, stagger: 300, steps: { fr: step('fade'), ph: step('ink'), nm: step('brush'), info: step('fade') } },
+      anim: { duration: 500, overlap: 60, stagger: 300, steps: { fr: step('fade'), ph: step('ink'), nm: step('brush'), info: step('fade'), rt: step('ink') } },
       scoreFx: 'fade',
       seal: { text: '勝', ink: '#ece0c8', color: '#8b2420', img: null, anim: 'ritual', fadeMs: 800, fadeMode: 'fade', autoFade: true },
       timer: { fx: 'heartbeat', warn: 10, vignette: true, shake: true }
@@ -135,12 +139,12 @@ function defaultCues() {
     {
       id: 'c-semi1', type: 'battle', battle: 'semi1', name: '四強對戰 1',
       left: { source: 'top4', index: 0 }, right: { source: 'top4', index: 1 },
-      title: 'SEMI FINAL', zh: '四強賽', rounds: 4, seconds: 60, own: false
+      title: 'SEMI FINAL', zh: '四強賽', rounds: 5, seconds: 60, own: false
     },
     {
       id: 'c-semi2', type: 'battle', battle: 'semi2', name: '四強對戰 2',
       left: { source: 'top4', index: 2 }, right: { source: 'top4', index: 3 },
-      title: 'SEMI FINAL', zh: '四強賽', rounds: 4, seconds: 60, own: false
+      title: 'SEMI FINAL', zh: '四強賽', rounds: 5, seconds: 60, own: false
     },
     {
       id: 'c-final', type: 'battle', battle: 'final', name: '決賽',
@@ -158,7 +162,7 @@ function defaultCues() {
 
 function defaultState() {
   return {
-    schema: 5,
+    schema: 6,
     event: {
       title: 'FUNKDATION VOL.4',
       fonts: [],

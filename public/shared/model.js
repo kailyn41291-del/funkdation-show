@@ -56,6 +56,19 @@
   }
   function judgeById(state, id) { return personById(state, 'judge', id); }
 
+  // 回合稱號（先鋒、策應…）與這回合兩隊上場的舞者名字
+  function roundInfo(state, battleId, round) {
+    var L = state && state.layouts && state.layouts.battle, rt = (L && L.rt) || {};
+    var b = state && state.results && state.results.battles && state.results.battles[battleId];
+    var i = (round || (b && b.round) || 1) - 1, nm = (b && b.names) || {};
+    return {
+      title: rt.on === false ? '' : ((rt.titles || [])[i] || ''),
+      img: rt.on === false ? '' : ((rt.images || [])[i] || ''),
+      l: ((nm.l || [])[i] || '').trim(),
+      r: ((nm.r || [])[i] || '').trim()
+    };
+  }
+
   // 九隊總覽：上排 top 隊、其餘在下排
   function overviewRows(n, top) {
     var t = Math.max(0, Math.min(n, top == null ? Math.floor(n / 2) : top));
@@ -164,7 +177,7 @@
       sharp: { lt: 'slam', lz: 'slide', fr: 'slam', ph: 'slide', en: 'slide', zh: 'slide', tt: 'slam' }
     },
     top4: { std: { fr: 'fade', ph: 'ink', en: 'brush', zh: 'brush' }, sharp: { fr: 'slam', ph: 'slide', en: 'slide', zh: 'slide' } },
-    battle: { std: { fr: 'fade', ph: 'ink', nm: 'brush', info: 'fade' }, sharp: { fr: 'slam', ph: 'slide', nm: 'slide', info: 'fade' } },
+    battle: { std: { fr: 'fade', ph: 'ink', nm: 'brush', info: 'fade', rt: 'ink' }, sharp: { fr: 'slam', ph: 'slide', nm: 'slide', info: 'fade', rt: 'slam' } },
     champ: {
       std: { lt: 'ink', lz: 'ink', sf: 'fade', sp: 'ink', sn: 'brush', sz: 'brush', st: 'ink', df: 'fade', dp: 'ink', dn: 'brush', dt: 'ink' },
       sharp: { lt: 'slam', lz: 'slide', sf: 'slam', sp: 'slide', sn: 'slide', sz: 'slide', st: 'slam', df: 'slam', dp: 'slide', dn: 'slide', dt: 'slam' }
@@ -192,7 +205,7 @@
 
   global.FDM = {
     zhNum: zhNum, TYPES: TYPES, BATTLES: BATTLES, FX_IN: FX_IN, FX_OUT: FX_OUT,
-    teamById: teamById, judgeById: judgeById, PEOPLE: PEOPLE, isPerson: isPerson, peopleOf: peopleOf, personById: personById, overviewRows: overviewRows, TOP4_RANK: TOP4_RANK, top4Label: top4Label, battleCue: battleCue, resolve: resolve, sourceLabel: sourceLabel,
+    teamById: teamById, judgeById: judgeById, PEOPLE: PEOPLE, isPerson: isPerson, roundInfo: roundInfo, peopleOf: peopleOf, personById: personById, overviewRows: overviewRows, TOP4_RANK: TOP4_RANK, top4Label: top4Label, battleCue: battleCue, resolve: resolve, sourceLabel: sourceLabel,
     cueTitle: cueTitle, cueSub: cueSub, layoutKey: layoutKey, layoutFor: layoutFor,
     chain: chain, PRESETS: PRESETS, presetAnim: presetAnim, line2: line2
   };
