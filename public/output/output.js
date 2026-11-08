@@ -841,7 +841,8 @@
       var on = rt.on !== false && !cue.noTitles, gen = ++rtGen;
       var photoMode = on && rt.mode === 'photo';
       // 照片框模式：藏起團隊照片（外框保留）
-      [pL, pR].forEach(function (p) { p.img.style.visibility = photoMode ? 'hidden' : ''; });
+      // 照片框模式：團隊照片與外框都不顯示，只放稱號
+      [pL, pR].forEach(function (p) { p.img.style.visibility = p.fr.style.visibility = photoMode ? 'hidden' : ''; });
       rtPhoto = photoMode;
       [rtA.tW, rtA.iW, rtB.tW, rtB.iW, nmL.wrap, nmR.wrap].forEach(function (el) { el.style.display = on ? '' : 'none'; });
       if (!on) return;
@@ -850,8 +851,8 @@
       var pw = v.pw, ph = Math.round(pw * 2 / 3), xl = W / 2 - v.pd - pw, xr = W / 2 + v.pd;
       var geo;
       if (photoMode) {
-        var pad = (v.pad || 0) * pw / 840, k = (v.rp || 88) / 100;
-        geo = { cl: xl + pw / 2, cr: xr + pw / 2, cy: v.pt + ph / 2, maxH: (ph - 2 * pad) * k, maxW: (pw - 2 * pad) * k };
+        var k = (v.rp || 110) / 100; // 以原本照片框的高度為 100%
+        geo = { cl: xl + pw / 2, cr: xr + pw / 2, cy: v.pt + ph / 2 + (v.rpy || 0), maxH: ph * k, maxW: pw * k };
       } else {
         geo = { cl: W / 2 - (v.rx || 810), cr: W / 2 + (v.rx || 810), cy: v.ry || 440, maxH: v.rh || 400, maxW: 9999 };
       }

@@ -171,10 +171,10 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   await out.evaluate(() => window.fd.cmd([{ op: 'set', path: ['layouts', 'battle', 'rt', 'mode'], value: 'photo' }, { op: 'set', path: ['results', 'battles', 'semi1', 'round'], value: 3 }], { name: 'round', battle: 'semi1', round: 3 }));
   await sleep(1500);
   r = await read();
-  const pm = await out.evaluate(() => { const sc = document.querySelector('.scene:last-child'); const b = sc.querySelector('.pbox').getBoundingClientRect(); return { cx: b.left + b.width / 2, cy: b.top + b.height / 2, h: b.height, photo: [...sc.querySelectorAll('.pbox .ph img')].map(i => getComputedStyle(i).visibility).join() }; });
+  const pm = await out.evaluate(() => { const sc = document.querySelector('.scene:last-child'); const b = sc.querySelector('.pbox').getBoundingClientRect(); return { cx: b.left + b.width / 2, cy: b.top + b.height / 2, h: b.height, photo: [...sc.querySelectorAll('.pbox .ph img, .pbox .fr')].map(i => getComputedStyle(i).visibility).join() }; });
   const ib = await out.evaluate(() => { const r = document.querySelector('.scene:last-child .rimg').getBoundingClientRect(); return { cy: r.top + r.height / 2 }; });
-  check('照片框模式：「中樞」圖在左框正中央', r.L.v === 'img:round-3.png' && Math.abs(r.L.cx - pm.cx) < 3 && Math.abs(ib.cy - pm.cy) < 3 && r.L.h < pm.h, Math.round(r.L.cx) + ',' + Math.round(ib.cy) + ' vs ' + Math.round(pm.cx) + ',' + Math.round(pm.cy));
-  check('照片框模式：團隊照片隱藏', pm.photo === 'hidden,hidden', pm.photo);
+  check('照片框模式：「中樞」圖在左框正中央', r.L.v === 'img:round-3.png' && Math.abs(r.L.cx - pm.cx) < 3 && Math.abs(ib.cy - (pm.cy - 15)) < 3 && Math.abs(r.L.h - pm.h * 1.1) < 3, Math.round(r.L.cx) + ',' + Math.round(ib.cy) + ' vs ' + Math.round(pm.cx) + ',' + Math.round(pm.cy));
+  check('照片框模式：團隊照片與外框都隱藏', pm.photo === 'hidden,hidden,hidden,hidden', pm.photo);
   await out.screenshot({ path: path.join(SHOTS, 'rounds-photo.png') });
   // 表演賽：不顯示稱號，照片照常
   await ops([{ op: 'set', path: ['show', 'cueId'], value: 'c-exhib' }]);

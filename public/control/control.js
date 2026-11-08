@@ -1327,12 +1327,12 @@
     add(pane, [c.noTitles ? h('div', { class: 'hint warnline', text: '這個 Cue 設定為不顯示回合稱號（「基本」分頁可以打開）。下面的設定是所有對戰共用的。' }) : null,
       h('h3', { text: '回合稱號' }),
       fld('顯示', chk('依回合顯示稱號', rp.concat('on'))),
-      fld('位置', selPath(rp.concat('mode'), [['photo', '放在照片框裡（取代團隊照片）'], ['side', '照片框外側（保留團隊照片）']], function () { renderInspector(); })),
+      fld('位置', selPath(rp.concat('mode'), [['photo', '取代團隊照片（不顯示照片與外框）'], ['side', '照片框外側（保留團隊照片）']], function () { renderInspector(); })),
       h('div', { class: 'rttable' }, rows),
       h('div', { class: 'hint', text: '有上傳 PNG 的回合用圖片（透明背景），沒有的用下方的書法字。四強與決賽各 5 回合；表演賽不顯示。' }),
       h('h3', { text: '稱號位置與大小' }),
-      photoMode ? [sl(v.concat('rp'), '大小（框內 %）', 30, 140),
-        h('div', { class: 'hint', text: '稱號放在兩隊照片框正中央，團隊照片不顯示（外框保留）。位置跟著「版面」分頁的照片位置。名字在隊名下方。' })]
+      photoMode ? [sl(v.concat('rp'), '大小（%）', 30, 200), sl(v.concat('rpy'), '上下微調', -300, 300),
+        h('div', { class: 'hint', text: '稱號放在原本團隊照片的位置，照片與外框都不顯示。100% 等於原本照片的高度；位置跟著「版面」分頁的照片位置（照片寬度、左右間距、上下位置）。名字在隊名下方。' })]
         : [sl(v.concat('rh'), '大小（高度）', 80, 900), sl(v.concat('rx'), '左右位置', 300, 950), sl(v.concat('ry'), '上下位置', 100, 1000),
           h('div', { class: 'hint', text: '左右兩邊一起調、保持對稱。「左右位置」是離畫面中心的距離：數字越大越靠外側。' })],
       h('h3', { text: '名字' }),
