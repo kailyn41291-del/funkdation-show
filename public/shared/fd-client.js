@@ -135,6 +135,11 @@
       ws.onmessage = function (ev) {
         var m;
         try { m = JSON.parse(ev.data); } catch (e) { return; }
+        if (m.type === 'hello' && m.build) {
+          // 程式更新過（伺服器重新啟動後版本不同）：重新整理，載入新版畫面
+          if (api.build && api.build !== m.build) { location.reload(); return; }
+          api.build = m.build;
+        }
         if (m.type === 'hello' || m.type === 'state') {
           server = m.state;
           rebuild();

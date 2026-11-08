@@ -202,6 +202,20 @@ store.on('saved', rev => broadcast({ type: 'saved', rev }));
 store.on('backup', name => log('已備份', name));
 store.on('error-log', e => log('錯誤', e.message));
 
+// 畫面程式的指紋：更新後重新啟動，已經開著的瀏覽器／OBS 畫面連回來時發現不同就自動重新整理，
+// 不會繼續跑舊版程式（舊版看不到新功能）
+const BUILD = process.env.FD_BUILD || (() => {
+  const h = require('crypto').createHash('sha1');
+  const walk = d => {
+    for (const f of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const p = path.join(d, f.name);
+      if (f.isDirectory()) { if (f.name !== 'fonts' && f.name !== 'builtin') walk(p); }
+      else if (/\.(js|css|html)$/.test(f.name)) { h.update(f.name); h.update(fs.readFileSync(p)); }
+    }
+  };
+  try { walk(PUBLIC_DIR); } catch { h.update(String(Date.now())); }
+  return h.digest('hex').slice(0, 12);
+})();
 wss.on('connection', (ws, req) => {
   ws.isAlive = true;
   // 其他裝置（遙控網頁、另一台電腦的輸出畫面）只能讀取，修改一律走遙控指令；
@@ -213,7 +227,7 @@ wss.on('connection', (ws, req) => {
   ws.readOnly = !isLocal(req) && remote.roleOfToken(ws.token) !== 'master';
   ws.remote = !isLocal(req);
   ws.on('pong', () => { ws.isAlive = true; });
-  ws.send(JSON.stringify({ type: 'hello', rev: store.rev, savedRev: store.savedRev, state: store.state, serverTime: Date.now() }));
+  ws.send(JSON.stringify({ type: 'hello', build: BUILD, rev: store.rev, savedRev: store.savedRev, state: store.state, serverTime: Date.now() }));
   ws.on('message', data => {
     let msg;
     try { msg = JSON.parse(data); } catch { return; }
