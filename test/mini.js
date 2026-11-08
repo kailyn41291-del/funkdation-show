@@ -82,13 +82,13 @@ const state = async () => (await (await fetch(BASE + '/api/state')).json()).stat
   await sleep(1500);
   const m2 = await Promise.all([
     out.evaluate(async () => {
-      const L = [document.getElementById('bgA'), document.getElementById('bgB')];
+      const L = () => [...document.querySelectorAll('.bg')];
       let min = 1;
       const t0 = performance.now();
       while (performance.now() - t0 < 1500) {
         await new Promise(r => requestAnimationFrame(r));
-        const o = L.map(e => Number(getComputedStyle(e).opacity));
-        min = Math.min(min, 1 - (1 - o[0]) * (1 - o[1]));
+        const o = L().map(e => Number(getComputedStyle(e).opacity));
+        min = Math.min(min, 1 - o.reduce((a, v) => a * (1 - v), 1));
       }
       return min;
     }),

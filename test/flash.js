@@ -50,12 +50,12 @@ async function upload(f) { const fd = new FormData(); fd.append('file', new Blob
     await sleep(1600);
     await p.evaluate(() => {
       window.__rec = []; window.__cover = 1;
-      const L = [document.getElementById('bgA'), document.getElementById('bgB')];
+      const L = () => [...document.querySelectorAll('.bg')];
       const t0 = performance.now();
       (function f() {
         const scs = document.querySelectorAll('#scenes .scene'), root = scs[scs.length - 1];
-        const o = L.map(e => +getComputedStyle(e).opacity);
-        window.__cover = Math.min(window.__cover, 1 - (1 - o[0]) * (1 - o[1]));
+        const o = L().map(e => +getComputedStyle(e).opacity);
+        window.__cover = Math.min(window.__cover, 1 - o.reduce((a, v) => a * (1 - v), 1));
         if (root && root.dataset.mark !== 'old') {
           const frame = [];
           root.querySelectorAll('*').forEach((el, i) => {
@@ -86,10 +86,10 @@ async function upload(f) { const fd = new FormData(); fd.append('file', new Blob
   async function fadeOf(cueId) {
     await ops([{ op: 'set', path: ['show', 'cueId'], value: 'c-team1' }, { op: 'set', path: ['show', 'seq'], value: seq++ }]);
     await sleep(1600);
-    const before = await p.evaluate(() => { const t = document.querySelector('.bg[style*="z-index: 2"]'); return t ? t.id : ''; });
+    await p.evaluate(() => { document.querySelectorAll('.bg').forEach(e => { delete e.dataset.was; }); const t = document.querySelector('.bg[style*="z-index: 2"]'); if (t) t.dataset.was = '1'; });
     await ops([{ op: 'set', path: ['show', 'cueId'], value: cueId }, { op: 'set', path: ['show', 'seq'], value: seq++ }]);
     // 前一個畫面先退場，等新底圖換到上層開始淡入再量
-    await p.waitForFunction(b => { const t = document.querySelector('.bg[style*="z-index: 2"]'); return t && t.id !== b && t.classList.contains('on'); }, before, { timeout: 5000 }).catch(() => {});
+    await p.waitForFunction(() => { const t = document.querySelector('.bg[style*="z-index: 2"]'); return t && !t.dataset.was && t.classList.contains('on'); }, null, { timeout: 5000 }).catch(() => {});
     await sleep(150);
     return p.evaluate(() => {
       const top = [...document.querySelectorAll('.bg')].sort((a, b) => (+b.style.zIndex || 0) - (+a.style.zIndex || 0))[0];
@@ -105,6 +105,28 @@ async function upload(f) { const fd = new FormData(); fd.append('file', new Blob
   check('調成 2.5 秒', f.bg === '2.5s' && f.band === 2500, JSON.stringify(f));
   f = await fadeOf('c-top4');
   check('其他畫面不受影響（0.45 秒）', f.bg === '0.45s', JSON.stringify(f));
+
+  // 影片主視覺：開啟輸出畫面就先準備好；切走只暫停，切回來同一支影片接著播（不重新載入）
+  const vid = await upload('kv.webm');
+  await ops([{ op: 'set', path: ['layouts', 'idle', 'bg'], value: { mode: 'video', src: vid, color: '#8b2420', texture: true, sound: false } }, { op: 'set', path: ['layouts', 'idle', 'fade'], value: 1200 },
+    { op: 'set', path: ['show', 'cueId'], value: 'c-team1' }, { op: 'set', path: ['show', 'seq'], value: seq++ }]);
+  const pv = await browser.newPage({ viewport: { width: 960, height: 540 } });
+  pv.on('pageerror', e => errors.push('video page: ' + e.message));
+  await pv.goto(BASE + '/output/');
+  await sleep(2500);
+  const pre = await pv.evaluate(() => { const v = document.querySelector('.bg video'); if (v) v.__mark = 'first'; return v ? { ready: v.readyState, playing: !v.paused } : null; });
+  check('開啟時就先載入主視覺影片（還沒播到）', pre && pre.ready >= 2 && !pre.playing, JSON.stringify(pre));
+  const go = async (cueId) => { await ops([{ op: 'set', path: ['show', 'cueId'], value: cueId }, { op: 'set', path: ['show', 'seq'], value: seq++ }]); };
+  await go('c-open'); await sleep(4000);
+  const t1 = await pv.evaluate(() => { const v = document.querySelector('.bg video'); return { t: v.currentTime, playing: !v.paused, same: v.__mark === 'first', n: document.querySelectorAll('.bg video').length }; });
+  check('切到主視覺：影片播放中', t1.playing && t1.same && t1.n === 1, JSON.stringify(t1));
+  await go('c-team1'); await sleep(3000);
+  const t2 = await pv.evaluate(() => { const v = document.querySelector('.bg video'); return { t: v.currentTime, playing: !v.paused, src: !!v.getAttribute('src') }; });
+  check('切走：影片暫停但沒有卸載', !t2.playing && t2.src, JSON.stringify(t2));
+  await go('c-open'); await sleep(300);
+  const t3 = await pv.evaluate(() => { const v = document.querySelector('.bg video'); return { t: v.currentTime, same: v.__mark === 'first', ready: v.readyState }; });
+  check('切回主視覺：同一支影片直接接著播（不重新載入）', t3.same && t3.ready >= 3 && t3.t >= t2.t - 0.05 && t3.t > 0.5, JSON.stringify(t3));
+  await pv.close();
 
   check('沒有錯誤訊息', errors.length === 0, errors.join(' | '));
   await browser.close();

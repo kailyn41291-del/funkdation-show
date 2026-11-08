@@ -212,19 +212,93 @@
     effectsOn = ev.effectsEnabled !== false;
   }
 
-  // ---------- 底圖（兩層交替：新底圖在上層淡入，舊底圖在下面保持不動） ----------
-  // 不用「舊的淡出＋新的淡入」：兩層都半透明時黑底會透出來，畫面會暗一下（閃）
-  var bgLayers = [document.getElementById('bgA'), document.getElementById('bgB')];
-  var bgVisible = 0, bgSig = null, bgToken = 0, bgOldTimer = null;
+  // ---------- 底圖：每一種底圖一個固定的圖層，一直保持準備好 ----------
+  // - 切換時新底圖在最上層淡入，舊底圖在下面不動，淡入完成才收掉（不會透出黑底而閃一下）
+  // - 圖層不重複使用：主視覺影片切走時只是暫停，切回來直接接著播，不用重新載入、重新啟動解碼器（從其他畫面切回主視覺不會卡）
+  // - 開啟輸出畫面時，就把所有版面用到的底圖都先準備好
+  var stageEl = document.getElementById('stage'), shakeEl = document.getElementById('shake');
+  ['bgA', 'bgB'].forEach(function (id) { var e = document.getElementById(id); if (e) e.remove(); });
+  var bgCache = {}, bgOrder = [], BG_MAX = 8;
+  var bgCurrent = null, bgSig = null, bgToken = 0, bgOldTimer = null;
   function bgSignature(bg) { return bg ? [bg.mode, bg.src, bg.color, bg.texture ? 1 : 0].join('|') : 'none'; }
-  // 圖片解碼完成、影片第一格出來之後才開始淡入，最多等 1.5 秒
-  function whenReady(layer, bg, cb) {
-    var done = false, t = setTimeout(go, 1500);
+  function makeLayer(bg) {
+    var layer = document.createElement('div');
+    layer.className = 'bg';
+    stageEl.insertBefore(layer, shakeEl);
+    if (bg.mode === 'video' && bg.src) {
+      var v = document.createElement('video');
+      v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto';
+      v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
+      v.style.display = 'block';
+      v.src = asset(bg.src);
+      layer.appendChild(v);
+      if (STILL) v.addEventListener('loadedmetadata', function () { try { v.currentTime = 0.1; } catch (e) { /* 忽略 */ } }, { once: true });
+    } else if (bg.mode === 'image' && bg.src) {
+      layer.style.backgroundImage = 'url("' + asset(bg.src) + '")';
+    } else if (bg.mode === 'transparent') {
+      layer.style.backgroundColor = 'transparent';
+    } else {
+      layer.style.backgroundColor = bg.color || '#8b2420';
+      if (bg.texture !== false && bg.mode !== 'black') {
+        var tex = mk('div', 'tex', layer);
+        tex.style.display = 'block';
+        tex.style.backgroundImage = 'url(' + FX.noiseTexture('paper') + ')';
+      }
+    }
+    return layer;
+  }
+  function layerFor(bg) {
+    var sig = bgSignature(bg), e = bgCache[sig];
+    if (!e) {
+      e = bgCache[sig] = { sig: sig, bg: bg, el: makeLayer(bg) };
+      // 太多種底圖時，把最久沒用的收掉（正在顯示的不收）
+      while (bgOrder.length >= BG_MAX) {
+        var victim = null;
+        for (var i = 0; i < bgOrder.length; i++) if (bgCache[bgOrder[i]] !== bgCurrent) { victim = bgOrder.splice(i, 1)[0]; break; }
+        if (!victim) break;
+        var ve = bgCache[victim], vv = ve.el.querySelector('video');
+        if (vv) { vv.pause(); vv.removeAttribute('src'); vv.load(); }
+        ve.el.remove();
+        delete bgCache[victim];
+      }
+    } else bgOrder.splice(bgOrder.indexOf(sig), 1);
+    bgOrder.push(sig);
+    return e;
+  }
+  // 預先準備所有版面用到的底圖（預覽視窗只顯示一個畫面，不用準備）
+  var prewarmSig = '';
+  function prewarmBgs() {
+    if (MONITOR) return;   // 控制台的監看／預覽不用預先準備，省資源
+    var list = [], seen = {};
+    for (var k in S.layouts) {
+      var L = S.layouts[k];
+      if (!L || !L.bg) continue;
+      var sg = bgSignature(L.bg);
+      if (seen[sg]) continue;
+      seen[sg] = true;
+      list.push(L.bg);
+    }
+    var sig = list.map(bgSignature).join('#');
+    if (sig === prewarmSig) return;
+    prewarmSig = sig;
+    list.slice(0, BG_MAX - 1).forEach(function (bg) { if (!bgCache[bgSignature(bg)]) layerFor(bg); });
+  }
+  function playVideo(v, sound) {
+    if (!v || STILL) return;
+    v.muted = MONITOR || !sound;
+    var p = v.play();
+    if (p && p.catch) p.catch(function () { v.muted = true; v.play().catch(function () {}); });
+  }
+  // 圖片解碼完成、影片開始播放（第一格出來）之後才開始淡入，最多等 1.5 秒
+  function whenReady(e, cb) {
+    var bg = e.bg, done = false, t = setTimeout(go, 1500);
     function go() { if (done) return; done = true; clearTimeout(t); cb(); }
     if (bg.mode === 'video' && bg.src) {
-      var v = layer.querySelector('video');
-      if (v.readyState >= 2) go();
-      else { v.addEventListener('loadeddata', go, { once: true }); v.addEventListener('error', go, { once: true }); }
+      var v = e.el.querySelector('video');
+      if (STILL) { if (v.readyState >= 2) go(); else v.addEventListener('loadeddata', go, { once: true }); return; }
+      if (v.readyState >= 3 && !v.paused) { go(); return; }
+      v.addEventListener('playing', go, { once: true });
+      v.addEventListener('error', go, { once: true });
     } else if (bg.mode === 'image' && bg.src) {
       var im = new Image();
       im.src = asset(bg.src);
@@ -237,63 +311,38 @@
     bg = bg || { mode: 'color', color: '#000' };
     var sig = bgSignature(bg);
     document.body.classList.toggle('transparent', bg.mode === 'transparent');
-    var front = bgLayers[bgVisible];
     if (sig === bgSig) {
-      var fv = front.querySelector('video');
-      if (fv && bg.mode === 'video') fv.muted = MONITOR || !bg.sound;
+      var cv = bgCurrent && bgCurrent.el.querySelector('video');
+      if (cv) cv.muted = MONITOR || !bg.sound;
       return;
     }
     bgSig = sig;
     var token = ++bgToken;
     clearTimeout(bgOldTimer);
+    var e = layerFor(bg), old = bgCurrent;
     // 上一次的淡入還沒結束就又切換：先讓它直接到位，當作新的「舊底圖」
-    front.style.transition = 'none';
-    front.classList.add('on');
-    var idx = 1 - bgVisible, layer = bgLayers[idx], old = front;
-    layer.style.transition = 'none';
-    layer.classList.remove('on');
-    void layer.offsetWidth;
-    layer.style.zIndex = 2;
-    old.style.zIndex = 1;
-    var video = layer.querySelector('video');
-    var tex = layer.querySelector('.tex') || mk('div', 'tex', layer);
-    layer.style.backgroundColor = '';
-    layer.style.backgroundImage = '';
-    tex.style.display = 'none';
-    if (bg.mode === 'video' && bg.src) {
-      video.style.display = 'block';
-      if (video.getAttribute('src') !== asset(bg.src)) video.src = asset(bg.src);
-      video.muted = MONITOR || !bg.sound;
-      if (STILL) { video.pause(); video.currentTime = 0.1; }
-      else video.play().catch(function () { video.muted = true; video.play().catch(function () {}); });
-    } else {
-      video.pause();
-      video.removeAttribute('src');
-      video.load();
-      video.style.display = 'none';
-      if (bg.mode === 'image' && bg.src) layer.style.backgroundImage = 'url("' + asset(bg.src) + '")';
-      else if (bg.mode === 'transparent') layer.style.backgroundColor = 'transparent';
-      else {
-        layer.style.backgroundColor = bg.color || '#8b2420';
-        if (bg.texture !== false && bg.mode !== 'black') {
-          tex.style.display = 'block';
-          tex.style.backgroundImage = 'url(' + FX.noiseTexture('paper') + ')';
-        }
-      }
-    }
-    whenReady(layer, bg, function () {
+    if (old) { old.el.style.transition = 'none'; old.el.classList.add('on'); old.el.style.zIndex = 1; }
+    for (var k in bgCache) if (bgCache[k] !== e && bgCache[k] !== old) { var o = bgCache[k].el; o.style.transition = 'none'; o.classList.remove('on'); o.style.zIndex = 0; }
+    e.el.style.transition = 'none';
+    e.el.classList.remove('on');
+    e.el.style.zIndex = 2;
+    void e.el.offsetWidth;
+    playVideo(e.el.querySelector('video'), bg.sound);
+    whenReady(e, function () {
       if (token !== bgToken) return;
-      bgVisible = idx;
-      layer.style.transition = instant ? 'none' : 'opacity ' + dur + 'ms ease';
-      layer.classList.add('on');
+      bgCurrent = e;
+      e.el.style.transition = instant ? 'none' : 'opacity ' + dur + 'ms ease';
+      e.el.classList.add('on');
+      if (!old || old === e) return;
       // 透明底圖蓋不住舊底圖，舊的要一起淡出；其他情況等新底圖完全淡入後再把舊的收起來
-      if (bg.mode === 'transparent') { old.style.transition = instant ? 'none' : 'opacity ' + dur + 'ms ease'; old.classList.remove('on'); }
+      if (bg.mode === 'transparent') { old.el.style.transition = instant ? 'none' : 'opacity ' + dur + 'ms ease'; old.el.classList.remove('on'); }
       bgOldTimer = setTimeout(function () {
         if (token !== bgToken) return;
-        old.style.transition = 'none';
-        old.classList.remove('on');
-        var ov = old.querySelector('video');
-        if (ov) ov.pause();
+        old.el.style.transition = 'none';
+        old.el.classList.remove('on');
+        old.el.style.zIndex = 0;
+        var ov = old.el.querySelector('video');
+        if (ov) ov.pause();   // 只暫停，不卸載：切回來可以直接接著播
       }, instant ? 0 : dur + 70);
     });
   }
@@ -352,6 +401,7 @@
       for (var r = 0; r < 3; r++) {
         sp.logos.forEach(function (l) {
           var im = mk('img', '', track);
+          im.decoding = 'async';   // 解碼不要卡住畫面
           im.src = asset(l.src);
           im.alt = '';
           im.style.height = (sp.height * (l.scale || 100) / 100) + 'px';
@@ -1146,6 +1196,7 @@
   function render(meta) {
     applyLook();
     preloadAssets();
+    prewarmBgs();
     var cue = targetCue();
     var key = sceneKey(cue);
     var seq = PREVIEW ? 0 : S.show.seq;
