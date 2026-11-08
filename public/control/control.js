@@ -50,7 +50,10 @@
   var S = null, D = null;
   var ui = Object.assign({ page: 'flow', mode: 'edit', sel: null, tabs: {}, photoSide: 'L', team: 't1', pkind: 'judge', psel: {}, guides: { safe: false, lines: false } },
     (function () { try { return JSON.parse(localStorage.getItem('fd-ui') || '{}'); } catch (e) { return {}; } })());
-  function saveUi() { try { localStorage.setItem('fd-ui', JSON.stringify(ui)); } catch (e) { /* 忽略 */ } }
+  // 演出小面板（?mini=1）：永遠在最上層的小視窗，只有 GO 與播出中 Cue 的操作，搭配 OBS／Arena 時不用切視窗
+  var MINI = /[?&]mini=1/.test(location.search);
+  if (MINI) { ui.page = 'flow'; ui.mode = 'show'; document.documentElement.classList.add('mini'); }
+  function saveUi() { if (MINI) return; try { localStorage.setItem('fd-ui', JSON.stringify(ui)); } catch (e) { /* 忽略 */ } }
 
   var status = { conn: 'connecting', saved: true };
   var fd = FD.connect({
@@ -274,6 +277,19 @@
   var PAGES = [['flow', '流程'], ['teams', '隊伍'], ['judges', '評審／MC／DJ'], ['sponsors', '贊助商'], ['assets', '素材與字型'], ['settings', '設定']];
   function renderHeader() {
     headerEl.innerHTML = '';
+    if (MINI) {
+      var top = !window.funk || !window.funk.miniOnTop || miniTop;
+      add(headerEl, [
+        h('div', { class: 'brand', text: 'FUNKDATION' }, h('small', { text: '演出小面板' })),
+        h('div', { class: 'spacer' }),
+        window.funk && window.funk.miniOnTop ? h('button', { class: 'small' + (top ? ' on' : ''), title: '永遠顯示在其他視窗（OBS、Arena）上面', text: top ? '📌 置頂中' : '置頂', onclick: function () {
+          miniTop = !miniTop; window.funk.miniOnTop(miniTop); renderHeader();
+        } }) : null,
+        h('div', { class: 'status', id: 'status' })
+      ]);
+      renderStatus();
+      return;
+    }
     add(headerEl, [
       h('div', { class: 'brand', text: 'FUNKDATION' }, h('small', { text: '控制台' })),
       h('nav', null, PAGES.map(function (p) {
@@ -283,6 +299,7 @@
         h('button', { class: ui.mode === 'edit' ? 'on' : '', text: '編排', onclick: function () { setMode('edit'); } }),
         h('button', { class: ui.mode === 'show' ? 'on' : '', text: '演出', onclick: function () { setMode('show'); } })) : null,
       h('div', { class: 'spacer' }),
+      window.funk && window.funk.openMini ? h('button', { text: '演出小面板', title: '開一個永遠在最上層的小視窗（GO、比分、Timer、印章），搭配 OBS／Arena 時不用來回切換', onclick: function () { window.funk.openMini(); } }) : null,
       window.funk ? h('button', { text: '開啟輸出畫面', title: '有第二個螢幕（投影機）時會全螢幕顯示在第二個螢幕', onclick: function () {
         window.funk.displays().then(function (list) {
           var ext = list.filter(function (d) { return !d.primary; })[0];
@@ -316,6 +333,7 @@
   // 頁面
   // ---------------------------------------------------------------------------
   var flowView = null; // { mode, cues, center, insp, previewMon, liveMon, nextMon }
+  var miniTop = true;
   function renderPage(partial) {
     if (!S || !D) return;
     liveUpdaters = [];
@@ -374,6 +392,8 @@
       add(center, [flowView.previewMon.el, flowView.testbar,
         h('div', { class: 'hint', text: '預覽只在這裡播放，不會影響正在播出的輸出畫面。所有修改都會自動存檔。' })]);
       flowView.previewMon.frame.addEventListener('load', function () { sendGuides(); });
+    } else if (MINI) {
+      // 小面板不放監看畫面（省資源）；看畫面請看 OBS／Arena
     } else {
       var nx = nextCue();
       flowView.liveMon = monitor('/output/?monitor=1', 'LIVE 播出中', 'live');
@@ -408,7 +428,9 @@
     col.innerHTML = '';
     if (ui.mode === 'show') {
       var nx = nextCue();
+      var lc = liveCue();
       add(col, h('div', { class: 'gobox' },
+        MINI ? h('div', { class: 'nowline' }, '播出中：', h('b', { text: lc ? FDM.cueTitle(S, lc) : '（尚未開始）' })) : null,
         h('button', { class: 'go', text: 'GO', title: '空白鍵', onclick: go }),
         h('div', { class: 'nextline', id: 'nextline' }, '下一個：', h('b', { text: nx ? FDM.cueTitle(S, nx) : '（已是最後一個）' })),
         h('div', { class: 'row' },

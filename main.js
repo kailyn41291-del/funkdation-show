@@ -42,6 +42,7 @@ process.env.FD_PORT = process.env.FD_PORT || '3010';
 let server = null;
 let control = null;
 let output = null;
+let mini = null;
 let port = 3010;
 let quitting = false;
 let sleepBlock = null;
@@ -98,6 +99,31 @@ function openOutput(displayId, fullscreen = true) {
   buildMenu();
 }
 
+// 演出小面板：永遠在最上層（OBS、Arena 上面），演出時不用切回控制台
+function setMiniTop(on) {
+  if (!mini || mini.isDestroyed()) return;
+  mini.setAlwaysOnTop(on, 'floating');
+  if (IS_MAC) mini.setVisibleOnAllWorkspaces(on, { visibleOnFullScreen: true });
+}
+function openMini() {
+  if (mini && !mini.isDestroyed()) { mini.show(); mini.focus(); return; }
+  const wa = screen.getPrimaryDisplay().workArea;
+  const w = 420, hgt = Math.min(780, wa.height - 40);
+  mini = new BrowserWindow({
+    x: wa.x + wa.width - w - 20, y: wa.y + 20, width: w, height: hgt, minWidth: 340, minHeight: 360,
+    backgroundColor: '#16110f',
+    title: 'FUNKDATION 演出小面板',
+    alwaysOnTop: true,
+    autoHideMenuBar: true,
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: false, backgroundThrottling: false }
+  });
+  mini.setMenuBarVisibility(false);
+  setMiniTop(true);
+  mini.loadURL(url('/control/?mini=1'));
+  mini.webContents.setWindowOpenHandler(({ url: u }) => { shell.openExternal(u); return { action: 'deny' }; });
+  mini.on('closed', () => { mini = null; });
+}
+
 function closeOutput() {
   if (output && !output.isDestroyed()) output.close();
 }
@@ -123,7 +149,9 @@ function buildMenu() {
         ...outs,
         { type: 'separator' },
         { label: '輸出視窗：切換全螢幕', accelerator: 'CmdOrCtrl+Shift+F', enabled: !!output, click: () => output && setFull(output, !isFull(output)) },
-        { label: '關閉輸出視窗', enabled: !!output, click: closeOutput }
+        { label: '關閉輸出視窗', enabled: !!output, click: closeOutput },
+        { type: 'separator' },
+        { label: '演出小面板（永遠在最上層）', accelerator: 'CmdOrCtrl+Shift+M', click: openMini }
       ]
     },
     {
@@ -179,6 +207,8 @@ ipcMain.handle('fd:openOutput', (e, id, fs) => { openOutput(id, fs !== false); r
 ipcMain.handle('fd:closeOutput', () => { closeOutput(); return true; });
 ipcMain.handle('fd:openDataFolder', () => shell.openPath(DATA_DIR));
 ipcMain.handle('fd:version', () => app.getVersion());
+ipcMain.handle('fd:openMini', () => { openMini(); return true; });
+ipcMain.handle('fd:miniOnTop', (e, on) => { setMiniTop(on); return true; });
 ipcMain.handle('fd:checkUpdate', () => updater.prompt(true));
 
 app.on('second-instance', () => {

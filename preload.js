@@ -12,5 +12,7 @@ contextBridge.exposeInMainWorld('funk', {
   openDataFolder: () => ipcRenderer.invoke('fd:openDataFolder'),
   version: () => ipcRenderer.invoke('fd:version'),
   checkUpdate: () => ipcRenderer.invoke('fd:checkUpdate'),
-  onUpdate: cb => ipcRenderer.on('fd:update', (e, msg) => cb(msg))
+  onUpdate: cb => ipcRenderer.on('fd:update', (e, msg) => cb(msg)),
+  openMini: () => ipcRenderer.invoke('fd:openMini'),
+  miniOnTop: on => ipcRenderer.invoke('fd:miniOnTop', !!on)
 });

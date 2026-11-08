@@ -212,23 +212,47 @@
     effectsOn = ev.effectsEnabled !== false;
   }
 
-  // ---------- 底圖（兩層交替淡入） ----------
+  // ---------- 底圖（兩層交替：新底圖在上層淡入，舊底圖在下面保持不動） ----------
+  // 不用「舊的淡出＋新的淡入」：兩層都半透明時黑底會透出來，畫面會暗一下（閃）
   var bgLayers = [document.getElementById('bgA'), document.getElementById('bgB')];
-  var bgFront = 0, bgSig = null;
+  var bgVisible = 0, bgSig = null, bgToken = 0, bgOldTimer = null;
   function bgSignature(bg) { return bg ? [bg.mode, bg.src, bg.color, bg.texture ? 1 : 0].join('|') : 'none'; }
+  // 圖片解碼完成、影片第一格出來之後才開始淡入，最多等 1.5 秒
+  function whenReady(layer, bg, cb) {
+    var done = false, t = setTimeout(go, 1500);
+    function go() { if (done) return; done = true; clearTimeout(t); cb(); }
+    if (bg.mode === 'video' && bg.src) {
+      var v = layer.querySelector('video');
+      if (v.readyState >= 2) go();
+      else { v.addEventListener('loadeddata', go, { once: true }); v.addEventListener('error', go, { once: true }); }
+    } else if (bg.mode === 'image' && bg.src) {
+      var im = new Image();
+      im.src = asset(bg.src);
+      if (im.decode) im.decode().then(go, go); else { im.onload = go; im.onerror = go; }
+    } else go();
+  }
   function applyBg(bg, instant) {
     bg = bg || { mode: 'color', color: '#000' };
     var sig = bgSignature(bg);
     document.body.classList.toggle('transparent', bg.mode === 'transparent');
-    var front = bgLayers[bgFront];
-    var v = front.querySelector('video');
+    var front = bgLayers[bgVisible];
     if (sig === bgSig) {
-      if (v && bg.mode === 'video') v.muted = MONITOR || !bg.sound;
+      var fv = front.querySelector('video');
+      if (fv && bg.mode === 'video') fv.muted = MONITOR || !bg.sound;
       return;
     }
     bgSig = sig;
-    bgFront = 1 - bgFront;
-    var layer = bgLayers[bgFront], old = front;
+    var token = ++bgToken;
+    clearTimeout(bgOldTimer);
+    // 上一次的淡入還沒結束就又切換：先讓它直接到位，當作新的「舊底圖」
+    front.style.transition = 'none';
+    front.classList.add('on');
+    var idx = 1 - bgVisible, layer = bgLayers[idx], old = front;
+    layer.style.transition = 'none';
+    layer.classList.remove('on');
+    void layer.offsetWidth;
+    layer.style.zIndex = 2;
+    old.style.zIndex = 1;
     var video = layer.querySelector('video');
     var tex = layer.querySelector('.tex') || mk('div', 'tex', layer);
     layer.style.backgroundColor = '';
@@ -255,12 +279,21 @@
         }
       }
     }
-    layer.style.transition = instant ? 'none' : '';
-    old.style.transition = instant ? 'none' : '';
-    layer.classList.add('on');
-    old.classList.remove('on');
-    var ov = old.querySelector('video');
-    setTimeout(function () { if (!old.classList.contains('on')) { ov.pause(); } }, 600);
+    whenReady(layer, bg, function () {
+      if (token !== bgToken) return;
+      bgVisible = idx;
+      layer.style.transition = instant ? 'none' : '';
+      layer.classList.add('on');
+      // 透明底圖蓋不住舊底圖，舊的要一起淡出；其他情況等新底圖完全淡入後再把舊的收起來
+      if (bg.mode === 'transparent') { old.style.transition = instant ? 'none' : ''; old.classList.remove('on'); }
+      bgOldTimer = setTimeout(function () {
+        if (token !== bgToken) return;
+        old.style.transition = 'none';
+        old.classList.remove('on');
+        var ov = old.querySelector('video');
+        if (ov) ov.pause();
+      }, instant ? 0 : 520);
+    });
   }
 
   // =====================================================================
