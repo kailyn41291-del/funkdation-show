@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>FUNKDATION 倒數</title>
+<link rel="icon" href="/favicon.svg">
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #ece0c8; overflow: hidden; }
+  body { display: grid; place-items: center; cursor: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  /* 數字依螢幕大小放到最大：寬度約 4.6 個字寬、高度約 1 行 */
+  #t {
+    font: 800 min(38vw, 82vh)/1 -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
+    font-variant-numeric: tabular-nums; letter-spacing: -.02em; white-space: nowrap; transition: color .2s;
+  }
+  #t.warn { color: #ffb020; animation: beat 1s ease-in-out infinite; }
+  #t.over { color: #ff4a3d; animation: none; }
+  #t.idle { color: #8f8577; }
+  @keyframes beat { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.06); } 30% { transform: scale(1); } }
+  #off { position: fixed; top: calc(12px + env(safe-area-inset-top)); left: calc(14px + env(safe-area-inset-left)); display: none; align-items: center; gap: 8px; color: #ff6b5e; font: 600 15px/1 -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  #off i { width: 12px; height: 12px; border-radius: 50%; background: #ff4a3d; }
+  body.offline #off { display: flex; }
+  body.offline #t { opacity: .35; }
+  @media (prefers-reduced-motion: reduce) { #t.warn { animation: none; } }
+</style>
+</head>
+<body>
+<div id="t" class="idle" role="timer" aria-live="off">–:––</div>
+<div id="off"><i></i>連線中斷，重新連線中…</div>
+<script src="/shared/fd-client.js"></script>
+<script>
+/* 倒數顯示：只看不能操作（不用密碼）。時間以播出電腦為準，每 0.1 秒更新 */
+(function () {
+  'use strict';
+  var el = document.getElementById('t'), S = null, last = '';
+  var fd = FD.connect({
+    onState: function (s) { S = s; },
+    onStatus: function (st) { document.body.classList.toggle('offline', st !== 'online'); }
+  });
+  function left() {
+    var t = (S && S.show && S.show.timer) || {};
+    if (t.endsAt) return Math.max(0, (t.endsAt - fd.now()) / 1000);
+    return t.pausedLeft != null ? t.pausedLeft : (t.duration || 0);
+  }
+  function draw() {
+    if (!S) return;
+    var t = S.show.timer || {}, sec = left(), running = !!t.endsAt && sec > 0;
+    var warn = (S.layouts && S.layouts.battle && S.layouts.battle.timer && S.layouts.battle.timer.warn) || 10;
+    var s = Math.ceil(sec - 0.001), txt = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    var cls = sec <= 0 ? 'over' : running && sec <= warn ? 'warn' : running ? '' : 'idle';
+    if (txt !== last) { el.textContent = txt; last = txt; }
+    if (el.className !== cls) el.className = cls;
+  }
+  setInterval(draw, 100);
+  // 點一下切換全螢幕
+  document.addEventListener('click', function () {
+    var d = document, de = d.documentElement;
+    try {
+      if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+      else (de.requestFullscreen || de.webkitRequestFullscreen).call(de);
+    } catch (e) { /* 不支援全螢幕（例如 iPhone） */ }
+  });
+  // 盡量讓螢幕不要自動關掉（瀏覽器支援時）
+  function wake() { try { if (navigator.wakeLock) navigator.wakeLock.request('screen').catch(function () {}); } catch (e) { /* 不支援 */ } }
+  wake();
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) wake(); });
+})();
+</script>
+</body>
+</html>

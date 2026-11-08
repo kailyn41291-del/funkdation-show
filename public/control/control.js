@@ -1592,18 +1592,22 @@
               saveCfg(v ? '已更新 Timer 專用密碼' : '已關閉 Timer 專用密碼');
             } }),
             h('span', { class: 'faint', text: '只能控制 Timer（給計時人員）' })),
+          c.urls.length ? h('div', { class: 'qrs' }, c.urls.map(function (u, i) {
+            var net = '網路：' + u.name + (u.virtual ? '（虛擬網卡，手機通常連不到）' : '');
+            return h('div', { class: 'qrset' + (u.virtual ? ' virtual' : '') },
+              c.enabled ? [qrItem(u.qr, u.url, '完整遙控', net), qrItem(u.timerQr, u.timerUrl, 'Timer 專用', net)] : null,
+              qrItem(u.clockQr, u.clockUrl, '倒數顯示（不用密碼）', net));
+          })) : h('div', { class: 'err', text: '這台電腦目前沒有連上任何網路，手機無法連線。請先連上 Wi-Fi 或手機熱點（不需要網際網路）。連上後這裡會自動出現 QR Code。' }),
           c.enabled ? [
-            c.urls.length ? h('div', { class: 'qrs' }, c.urls.map(function (u, i) {
-              var net = '網路：' + u.name + (u.virtual ? '（虛擬網卡，手機通常連不到）' : '');
-              return h('div', { class: 'qrset' + (u.virtual ? ' virtual' : '') }, qrItem(u.qr, u.url, '完整遙控', net), qrItem(u.timerQr, u.timerUrl, 'Timer 專用', net));
-            })) : h('div', { class: 'err', text: '這台電腦目前沒有連上任何網路，手機無法連線。請先連上 Wi-Fi 或手機熱點（不需要網際網路）。連上後這裡會自動出現 QR Code。' }),
-            c.urls.length > 1 ? h('div', { class: 'hint', text: '有好幾組網址時，請用和手機「同一個網路」的那一組（例如連手機熱點時，通常是 172.20.10 或 192.168 開頭）。' }) : null,
+            null,
             h('div', { class: 'btnrow', style: 'align-items:center' },
               h('span', { class: 'muted', text: '已登入的裝置：' + c.devices + ' 台' + (c.timerDevices ? '（其中 Timer 專用 ' + c.timerDevices + ' 台）' : '') }),
               h('button', { class: 'small', text: '登出所有裝置', onclick: function () { post({ logoutAll: true }).then(function () { toast('所有手機都已登出'); load(); }).catch(fail); } }),
               h('button', { class: 'small', text: '重新整理', onclick: load }))
           ] : null,
+          c.urls.length > 1 ? h('div', { class: 'hint', text: '有好幾組網址時，請用和手機「同一個網路」的那一組（例如連手機熱點時，通常是 172.20.10 或 192.168 開頭）。' }) : null,
           h('div', { class: 'hint', html: '手機連上<b>和這台電腦同一個 Wi-Fi</b>，掃 QR Code 或輸入網址，再輸入密碼即可使用。' +
+            '<br><b>倒數顯示</b>：只有大大的倒數數字，不用密碼也不能操作，適合放在舞台邊的平板或螢幕給舞者、MC 看（不用開啟遙控網頁也能用；點畫面可全螢幕）。' +
             '<br><b>完整遙控</b>：加減比分、選四強、控制 Timer。<b>Timer 專用</b>：只有倒數計時（開始／暫停、重置、秒數），用 Timer 專用密碼登入的人改不了比分。' +
             '<br>回合、印章、晉級與播放仍在控制台。換完整遙控密碼或關閉後，所有手機都要重新登入。' +
             '<br>Windows 第一次開啟時若跳出防火牆詢問，請允許「私人網路」，否則手機連不上。' })]);

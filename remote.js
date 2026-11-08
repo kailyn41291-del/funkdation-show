@@ -73,7 +73,7 @@ function createRemote({ dataDir, store, emit, lanAddresses, getPort }) {
   function authed(req) { return !!roleOf(req); }
 
   // ---------- 同網路裝置能開哪些網址 ----------
-  const LAN_OK = [/^\/remote(\/|$)/, /^\/timer\/?$/, /^\/output(\/|$)/, /^\/shared\//, /^\/fonts\//, /^\/builtin\//, /^\/assets\//, /^\/favicon\./, /^\/api\/remote\/(login|me|score|top4|timer)$/];
+  const LAN_OK = [/^\/remote(\/|$)/, /^\/timer\/?$/, /^\/clock(\/|$)/, /^\/output(\/|$)/, /^\/shared\//, /^\/fonts\//, /^\/builtin\//, /^\/assets\//, /^\/favicon\./, /^\/api\/remote\/(login|me|score|top4|timer)$/];
   function gate(req, res, next) {
     if (isLocal(req)) return next();
     if (req.path === '/' || req.path === '/control' || req.path.startsWith('/control/')) return res.redirect('/remote/');
@@ -141,8 +141,8 @@ function createRemote({ dataDir, store, emit, lanAddresses, getPort }) {
       if (!isLocal(req)) return res.status(403).end();
       const port = getPort();
       const qr = u => QRCode.toString(u, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
-      const list = networks().map(n => ({ ip: n.ip, name: n.name, virtual: n.virtual, url: `http://${n.ip}:${port}/remote/`, timerUrl: `http://${n.ip}:${port}/timer` }));
-      Promise.all(list.map(x => Promise.all([qr(x.url), qr(x.timerUrl)]).then(([a, b]) => Object.assign(x, { qr: a, timerQr: b }))))
+      const list = networks().map(n => ({ ip: n.ip, name: n.name, virtual: n.virtual, url: `http://${n.ip}:${port}/remote/`, timerUrl: `http://${n.ip}:${port}/timer`, clockUrl: `http://${n.ip}:${port}/clock/` }));
+      Promise.all(list.map(x => Promise.all([qr(x.url), qr(x.timerUrl), qr(x.clockUrl)]).then(([a, b, c]) => Object.assign(x, { qr: a, timerQr: b, clockQr: c }))))
         .then(urls => {
           let full = 0, timerOnly = 0;
           for (const r of tokens.values()) if (r.exp > Date.now()) { if (r.role === 'timer') timerOnly++; else full++; }

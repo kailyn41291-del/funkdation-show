@@ -53,6 +53,7 @@ app.use('/control', express.static(path.join(PUBLIC_DIR, 'control')));
 app.use('/output', express.static(path.join(PUBLIC_DIR, 'output')));
 app.use('/shared', express.static(path.join(PUBLIC_DIR, 'shared')));
 app.use('/remote', express.static(path.join(PUBLIC_DIR, 'remote')));
+app.use('/clock', express.static(path.join(PUBLIC_DIR, 'clock')));
 app.use('/builtin', express.static(path.join(PUBLIC_DIR, 'builtin'), { maxAge: '7d' }));
 app.use('/assets', express.static(store.assetsDir, { maxAge: 0 }));
 
