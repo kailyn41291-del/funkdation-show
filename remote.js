@@ -9,6 +9,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const QRCode = require('qrcode');
 
 const TOKEN_TTL = 24 * 60 * 60 * 1000;      // 登入一次可用 24 小時
@@ -19,6 +20,20 @@ const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 function isLocal(req) {
   const a = (req.socket && req.socket.remoteAddress) || '';
   return LOOPBACK.has(a);
+}
+
+// 手機能連的網址：排除 169.254（還沒連上網路時的暫時位址），虛擬網卡（VPN、VMware、Docker…）排到最後
+const VIRTUAL = /vmware|virtualbox|vbox|vethernet|hyper-v|docker|veth|br-|bridge|utun|tun|tap|zerotier|zt|tailscale|wsl|loopback/i;
+function networks() {
+  const out = [];
+  for (const [name, list] of Object.entries(os.networkInterfaces())) {
+    for (const a of list || []) {
+      if (a.family !== 'IPv4' || a.internal || a.address.startsWith('169.254.')) continue;
+      out.push({ ip: a.address, name, virtual: VIRTUAL.test(name) });
+    }
+  }
+  const rank = n => (n.virtual ? 10 : 0) + (/^(192\.168|172\.20\.10)\./.test(n.ip) ? 0 : /^10\./.test(n.ip) ? 1 : 2);
+  return out.sort((a, b) => rank(a) - rank(b));
 }
 
 function safeEqual(a, b) {
@@ -126,7 +141,7 @@ function createRemote({ dataDir, store, emit, lanAddresses, getPort }) {
       if (!isLocal(req)) return res.status(403).end();
       const port = getPort();
       const qr = u => QRCode.toString(u, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
-      const list = lanAddresses().map(ip => ({ url: `http://${ip}:${port}/remote/`, timerUrl: `http://${ip}:${port}/timer` }));
+      const list = networks().map(n => ({ ip: n.ip, name: n.name, virtual: n.virtual, url: `http://${n.ip}:${port}/remote/`, timerUrl: `http://${n.ip}:${port}/timer` }));
       Promise.all(list.map(x => Promise.all([qr(x.url), qr(x.timerUrl)]).then(([a, b]) => Object.assign(x, { qr: a, timerQr: b }))))
         .then(urls => {
           let full = 0, timerOnly = 0;
@@ -191,4 +206,4 @@ function createRemote({ dataDir, store, emit, lanAddresses, getPort }) {
   return { gate, routes, isLocal, authed, revokeAll, score, top4, timer, get config() { return config; } };
 }
 
-module.exports = { createRemote, isLocal };
+module.exports = { createRemote, isLocal, networks };

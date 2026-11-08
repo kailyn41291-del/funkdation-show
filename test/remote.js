@@ -246,6 +246,19 @@ const state = async () => (await json(LOCAL + '/api/state')).body.state;
   check('設定頁有兩種 QR Code', caps.includes('完整遙控') && caps.includes('Timer 專用'), caps.join(' / '));
   await ctrl.locator('.remote').screenshot({ path: path.join(SHOTS, 'remote-5-settings.png') });
 
+  console.log('換網路（到現場改連手機熱點）');
+  check('QR Code 標示網路名稱', (await ctrl.locator('.remote .qnet').first().textContent()).startsWith('網路：'));
+  // 模擬 IP 改變：/api/info 回傳新的位址，設定頁要自己重新整理並提示
+  let infoCalls = 0, cfgCalls = 0;
+  await ctrl.route('**/api/info', route => { infoCalls++; route.fulfill({ contentType: 'application/json', body: JSON.stringify({ addresses: ['172.20.10.3'] }) }); });
+  ctrl.on('request', r => { if (r.url().endsWith('/api/remote/config') && r.method() === 'GET') cfgCalls++; });
+  await ctrl.evaluate(() => document.activeElement && document.activeElement.blur());
+  await sleep(5000);
+  const toastTxt = await ctrl.locator('.toast').allTextContents().catch(() => []);
+  check('網路改變時設定頁自動更新 QR Code', infoCalls > 0 && cfgCalls > 0, 'info ' + infoCalls + '、重新讀取 ' + cfgCalls);
+  check('提示手機重新掃描', toastTxt.some(t => t.includes('網路已變更')) || (await ctrl.content()).includes('網路已變更'), toastTxt.join(' / '));
+  await ctrl.unroute('**/api/info');
+
   console.log('換密碼與暴力嘗試');
   await json(LOCAL + '/api/remote/config', { enabled: true, password: 'newpass99' });
   check('換密碼後舊的登入失效', (await json(LAN + '/api/remote/score', { battle: 'semi1', side: 'l', delta: 1 }, tok)).status === 401);

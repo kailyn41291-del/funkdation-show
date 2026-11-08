@@ -1570,10 +1570,11 @@
           if (en.checked && pw.value.trim().length < 4) { toast('請先設定至少 4 個字的密碼', true); en.checked = false; pw.focus(); return; }
           saveCfg(en.checked ? '已開啟遙控網頁' : '已關閉遙控網頁，所有手機都已登出');
         });
-        function qrItem(svg, url, cap) {
+        function qrItem(svg, url, cap, net) {
           var q = h('div', { class: 'qr' }); q.innerHTML = svg;
-          return h('div', { class: 'qritem' }, h('b', { class: 'qcap', text: cap }), q, h('code', { text: url }));
+          return h('div', { class: 'qritem' }, h('b', { class: 'qcap', text: cap }), q, h('code', { text: url }), net ? h('span', { class: 'faint qnet', text: net }) : null);
         }
+        box.dataset.ips = c.urls.map(function (u) { return u.ip; }).join(',');
         box.innerHTML = '';
         add(box, [
           h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:700;cursor:pointer' }, en, '開啟遙控網頁'),
@@ -1592,9 +1593,11 @@
             } }),
             h('span', { class: 'faint', text: '只能控制 Timer（給計時人員）' })),
           c.enabled ? [
-            c.urls.length ? h('div', { class: 'qrs' }, c.urls.map(function (u) {
-              return [qrItem(u.qr, u.url, '完整遙控'), qrItem(u.timerQr, u.timerUrl, 'Timer 專用')];
-            })) : h('div', { class: 'err', text: '這台電腦目前沒有連上任何網路，手機無法連線。請先連上 Wi-Fi（不需要網際網路，現場的路由器或手機熱點都可以）。' }),
+            c.urls.length ? h('div', { class: 'qrs' }, c.urls.map(function (u, i) {
+              var net = '網路：' + u.name + (u.virtual ? '（虛擬網卡，手機通常連不到）' : '');
+              return h('div', { class: 'qrset' + (u.virtual ? ' virtual' : '') }, qrItem(u.qr, u.url, '完整遙控', net), qrItem(u.timerQr, u.timerUrl, 'Timer 專用', net));
+            })) : h('div', { class: 'err', text: '這台電腦目前沒有連上任何網路，手機無法連線。請先連上 Wi-Fi 或手機熱點（不需要網際網路）。連上後這裡會自動出現 QR Code。' }),
+            c.urls.length > 1 ? h('div', { class: 'hint', text: '有好幾組網址時，請用和手機「同一個網路」的那一組（例如連手機熱點時，通常是 172.20.10 或 192.168 開頭）。' }) : null,
             h('div', { class: 'btnrow', style: 'align-items:center' },
               h('span', { class: 'muted', text: '已登入的裝置：' + c.devices + ' 台' + (c.timerDevices ? '（其中 Timer 專用 ' + c.timerDevices + ' 台）' : '') }),
               h('button', { class: 'small', text: '登出所有裝置', onclick: function () { post({ logoutAll: true }).then(function () { toast('所有手機都已登出'); load(); }).catch(fail); } }),
@@ -1607,6 +1610,16 @@
       }).catch(function () { box.replaceChildren(h('div', { class: 'faint', text: '無法讀取遙控設定' })); });
     }
     load();
+    // 換網路（例如到現場改連手機熱點）時 IP 會變：每 4 秒檢查一次，變了就自動更新網址與 QR Code
+    var watch = setInterval(function () {
+      if (!document.body.contains(box)) { clearInterval(watch); return; }
+      if (box.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;
+      fetch('/api/info').then(function (r) { return r.json(); }).then(function (i) {
+        var now = (i.addresses || []).filter(function (a) { return a.indexOf('169.254.') !== 0; }).slice().sort().join(',');
+        var was = (box.dataset.ips || '').split(',').filter(Boolean).sort().join(',');
+        if (box.dataset.ips != null && now !== was) { load(); toast('網路已變更，遙控網址與 QR Code 已更新，手機請重新掃描'); }
+      }).catch(function () {});
+    }, 4000);
     remoteCache = box;
     return box;
   }

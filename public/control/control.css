@@ -233,3 +233,7 @@ table.grid input[type=text] { width: 100%; }
 
 .remote .pwgrid { display: grid; grid-template-columns: auto auto auto 1fr; gap: 8px 10px; align-items: center; margin-top: 12px; }
 .remote .qcap { font-size: 13px; }
+
+.remote .qrset { display: flex; gap: 16px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.remote .qrset.virtual { opacity: .55; }
+.remote .qnet { font-size: 11px; max-width: 200px; text-align: center; }
